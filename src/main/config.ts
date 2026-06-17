@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,7 +17,7 @@ const DEFAULTS: FalaiConfig = {
   notchPosition: 'top-center',
 };
 
-export class ConfigManager {
+export class ConfigManager extends EventEmitter {
   private config: FalaiConfig = { ...DEFAULTS };
 
   private get configPath(): string {
@@ -39,6 +40,7 @@ export class ConfigManager {
     const dir = path.dirname(this.configPath);
     await fs.promises.mkdir(dir, { recursive: true });
     await fs.promises.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
+    this.emit('changed', this.config);
     return this.config;
   }
 

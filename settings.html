@@ -191,6 +191,12 @@
   <script>
     const sections = document.querySelectorAll('section');
     const sidebarItems = document.querySelectorAll('.sidebar-item');
+    const notchPosition = document.getElementById('notchPosition');
+    const language = document.getElementById('language');
+    const whisperModel = document.getElementById('whisperModel');
+    const hotkey = document.getElementById('hotkey');
+    const saveBtn = document.getElementById('save');
+    const cancelBtn = document.getElementById('cancel');
 
     sidebarItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -202,6 +208,38 @@
     });
 
     sections.forEach(s => s.style.display = s.id === 'general' ? 'block' : 'none');
+
+    async function loadConfig() {
+      try {
+        const cfg = await window.falaiAPI.loadConfig();
+        if (cfg.notchPosition) notchPosition.value = cfg.notchPosition;
+        if (cfg.language) language.value = cfg.language;
+        if (cfg.whisperModel) whisperModel.value = cfg.whisperModel;
+        if (cfg.hotkey) hotkey.value = cfg.hotkey;
+      } catch (err) {
+        console.error('Erro ao carregar config:', err);
+      }
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      try {
+        await window.falaiAPI.saveConfig({
+          notchPosition: notchPosition.value,
+          language: language.value,
+          whisperModel: whisperModel.value,
+          hotkey: hotkey.value,
+        });
+        window.falaiAPI.closeWindow();
+      } catch (err) {
+        console.error('Erro ao salvar config:', err);
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      window.falaiAPI.closeWindow();
+    });
+
+    loadConfig();
   </script>
 </body>
 </html>
