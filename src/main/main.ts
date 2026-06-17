@@ -33,6 +33,15 @@ async function bootstrap(): Promise<void> {
   });
 
   tray.onOpenSettings = () => notch.openSettings();
+  tray.onToggleStealth = () => {
+    // Toggle visibility will be handled by the pipeline/notch later.
+    // For now we just hide/show the pill window.
+    if (notch.isVisible?.()) {
+      notch.hide();
+    } else {
+      notch.show();
+    }
+  };
   tray.onQuit = () => app.quit();
 
   await pipeline.start();

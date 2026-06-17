@@ -76,6 +76,10 @@ export class NotchPill {
     this.window?.hide();
   }
 
+  isVisible(): boolean {
+    return this.window?.isVisible() ?? false;
+  }
+
   dispose(): void {
     this.window?.close();
     this.settingsWindow?.close();
