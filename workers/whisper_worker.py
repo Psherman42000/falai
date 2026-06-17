@@ -36,6 +36,37 @@ class WhisperWorker:
         self.audio_buffer: np.ndarray = np.array([], dtype=np.float32)
         self.recording = False
         self.language: str | None = None
+        self.stream: sd.InputStream | None = None
+
+    def _ensure_stream(self) -> bool:
+        if self.stream is not None:
+            return True
+        try:
+            self.stream = sd.InputStream(
+                samplerate=SAMPLE_RATE,
+                channels=1,
+                dtype=np.float32,
+                blocksize=int(SAMPLE_RATE * 0.1),
+                callback=_audio_callback(self),
+            )
+            self.stream.start()
+            return True
+        except Exception as exc:
+            log(f"Erro ao abrir microfone: {exc}")
+            traceback.print_exc(file=sys.stderr)
+            send("error", {"message": f"Microfone indisponível: {exc}"})
+            return False
+
+    def _close_stream(self) -> None:
+        if self.stream is None:
+            return
+        try:
+            self.stream.stop()
+            self.stream.close()
+        except Exception as exc:
+            log(f"Erro ao fechar stream: {exc}")
+        finally:
+            self.stream = None
 
     def load_model(self, model_name: str) -> bool:
         if model_name not in SUPPORTED_MODELS:
@@ -43,6 +74,7 @@ class WhisperWorker:
             return False
 
         if self.model and self.model_name == model_name:
+            send("status", {"status": "model_loaded", "model": model_name})
             return True
 
         try:
@@ -59,6 +91,13 @@ class WhisperWorker:
             return False
 
     def start_recording(self, language: str | None = None) -> None:
+        if not self._ensure_stream():
+            return
+        if self.model is None:
+            log("Modelo ainda não carregado; carregando default...")
+            if not self.load_model(DEFAULT_MODEL):
+                send("error", {"message": "Não foi possível carregar modelo para gravação"})
+                return
         self.language = language if language != "auto" else None
         self.audio_buffer = np.array([], dtype=np.float32)
         self.recording = True
@@ -66,6 +105,7 @@ class WhisperWorker:
 
     def stop_recording(self) -> None:
         self.recording = False
+        self._close_stream()
         send("status", {"status": "processing"})
         self._transcribe_buffer()
 
@@ -120,15 +160,6 @@ def main() -> None:
     log("Whisper Worker iniciando")
     worker = WhisperWorker()
 
-    stream = sd.InputStream(
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        dtype=np.float32,
-        blocksize=int(SAMPLE_RATE * 0.1),
-        callback=_audio_callback(worker),
-    )
-    stream.start()
-
     send("ready", {"worker": "whisper_worker"})
 
     try:
@@ -161,8 +192,7 @@ def main() -> None:
                 traceback.print_exc(file=sys.stderr)
                 send("error", {"message": str(exc)})
     finally:
-        stream.stop()
-        stream.close()
+        worker._close_stream()
         log("Whisper Worker finalizado")
 
 
