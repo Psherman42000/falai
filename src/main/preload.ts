@@ -6,4 +6,9 @@ contextBridge.exposeInMainWorld('falaiAPI', {
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   closeWindow: () => ipcRenderer.send('window-close'),
   quitApp: () => ipcRenderer.send('app-quit'),
+  onNotchState: (cb: (state: string, message?: string) => void) => {
+    const handler = (_event: unknown, data: { state: string; message?: string }) => cb(data.state, data.message);
+    ipcRenderer.on('notch-state', handler);
+    return () => ipcRenderer.removeListener('notch-state', handler);
+  },
 });

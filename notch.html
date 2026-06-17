@@ -99,17 +99,35 @@
 
     const states = {
       idle:       { icon: 'F', label: 'FALAI', detail: '' },
-      listening:  { icon: '\ud83c\udf99\ufe0f', label: 'Ouvindo', detail: '00:00' },
-      processing: { icon: '\u23f3', label: 'Processando', detail: '' },
-      typing:     { icon: '\u2713', label: 'Digitado', detail: '' },
-      error:      { icon: '\u2717', label: 'Erro', detail: '' },
+      listening:  { icon: '🎙️', label: 'Ouvindo', detail: '00:00' },
+      processing: { icon: '⏳', label: 'Processando', detail: '' },
+      typing:     { icon: '✓', label: 'Digitado', detail: '' },
+      error:      { icon: '✗', label: 'Erro', detail: '' },
     };
 
-    window.falaiAPI?.loadConfig().catch(() => ({}));
+    let listenStart = 0;
+    let timerId = null;
 
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      ipcRenderer.on('notch-state', (_event, data) => setState(data.state, data.message));
+    function formatMs(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function startTimer() {
+      stopTimer();
+      listenStart = Date.now();
+      timerId = setInterval(() => {
+        detail.textContent = formatMs(Date.now() - listenStart);
+      }, 500);
+    }
+
+    function stopTimer() {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
     }
 
     function setState(state, message) {
@@ -118,6 +136,16 @@
       icon.textContent = cfg.icon;
       label.textContent = cfg.label;
       detail.textContent = message ?? cfg.detail;
+
+      if (state === 'listening') {
+        startTimer();
+      } else {
+        stopTimer();
+      }
+    }
+
+    if (window.falaiAPI?.onNotchState) {
+      window.falaiAPI.onNotchState((state, message) => setState(state, message));
     }
   </script>
 </body>

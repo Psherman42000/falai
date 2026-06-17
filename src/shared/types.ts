@@ -4,6 +4,7 @@ export interface FalaiWindowAPI {
   minimizeWindow: () => void;
   closeWindow: () => void;
   quitApp: () => void;
+  onNotchState: (cb: (state: string, message?: string) => void) => () => void;
 }
 
 declare global {

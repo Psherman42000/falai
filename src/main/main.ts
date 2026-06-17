@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
   registerConfigIpc(config);
   registerWindowIpc();
 
-  const notch = new NotchPill();
+  const notch = new NotchPill(config);
   const tray = new TrayManager();
   const hotkey = new HotkeyManager(config);
   const voice = new VoicePipeline(config);
