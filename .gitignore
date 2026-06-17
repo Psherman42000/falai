@@ -7,3 +7,5 @@ release/
 *.exe
 *.msi
 *.nupkg
+__pycache__/
+*.pyc
