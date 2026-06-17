@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 
@@ -14,17 +15,30 @@ interface WhisperMessage {
   message?: string;
 }
 
+function resolvePython(): string {
+  for (const cmd of ['python', 'py', 'python3']) {
+    try {
+      execSync(`${cmd} --version`, { stdio: 'ignore', timeout: 5000 });
+      return cmd;
+    } catch { /* next */ }
+  }
+  return 'python';
+}
+
 export class VoicePipeline extends EventEmitter {
   private worker: WorkerProcess;
   private started = false;
 
   constructor(private config: ConfigManager) {
     super();
+    const pythonCmd = resolvePython();
     const script = path.join(__dirname, '..', '..', 'workers', 'whisper_worker.py');
+    console.log(`[voice-pipeline] Python: ${pythonCmd} | Script: ${script}`);
     this.worker = new WorkerProcess({
-      command: 'python',
+      command: pythonCmd,
       args: [script],
       env: { PYTHONIOENCODING: 'utf-8' },
+      label: 'voice',
     });
     this.worker.on('message', (msg: WhisperMessage) => this.handleMessage(msg));
     this.worker.on('error', (err: Error) => this.emit('error', err));

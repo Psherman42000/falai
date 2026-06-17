@@ -27,14 +27,23 @@ export class FalaiPipeline extends EventEmitter {
 
     this.deps.notch.show();
 
+    // 1. Inicia pipeline de voz (whisper worker)
     const voiceReady = await this.deps.voice.start();
     if (!voiceReady) {
-      throw new Error('Falha ao iniciar pipeline de voz');
+      throw new Error(
+        'Falha ao iniciar pipeline de voz.\n' +
+        'Verifique: python --version && pip install faster-whisper sounddevice numpy'
+      );
     }
 
+    // 2. Inicia hook de hotkey (pynput worker)
     const hotkeyReady = await this.deps.hotkey.start();
     if (!hotkeyReady) {
-      throw new Error('Falha ao iniciar hook de hotkey');
+      throw new Error(
+        'Falha ao iniciar hook de hotkey.\n' +
+        'Verifique: pip install pynput\n' +
+        'Se estiver no Windows, execute como Administrador.'
+      );
     }
 
     this.deps.hotkey.on('pressed', () => this.onPressed());
@@ -69,6 +78,7 @@ export class FalaiPipeline extends EventEmitter {
   }
 
   private onError(err: Error): void {
+    console.error('[pipeline] Error:', err.message);
     this.deps.notch.setState('error', err.message);
   }
 }
