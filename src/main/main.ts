@@ -20,7 +20,7 @@ async function bootstrap(): Promise<void> {
 
   const notch = new NotchPill();
   const tray = new TrayManager();
-  const hotkey = new HotkeyManager();
+  const hotkey = new HotkeyManager(config);
   const voice = new VoicePipeline(config);
   const injector = new TextInjector();
 

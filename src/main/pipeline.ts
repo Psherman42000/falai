@@ -15,33 +15,49 @@ interface PipelineDeps {
 }
 
 export class FalaiPipeline extends EventEmitter {
+  private isRunning = false;
+
   constructor(private deps: PipelineDeps) {
     super();
   }
 
   async start(): Promise<void> {
-    this.deps.notch.show();
-    await this.deps.voice.start();
-    this.deps.hotkey.register(this.deps.config.get().hotkey);
+    if (this.isRunning) return;
+    this.isRunning = true;
 
-    this.deps.hotkey.on('start-listening', () => this.onStartListening());
-    this.deps.hotkey.on('stop-listening', () => this.onStopListening());
+    this.deps.notch.show();
+
+    const voiceReady = await this.deps.voice.start();
+    if (!voiceReady) {
+      throw new Error('Falha ao iniciar pipeline de voz');
+    }
+
+    const hotkeyReady = await this.deps.hotkey.start();
+    if (!hotkeyReady) {
+      throw new Error('Falha ao iniciar hook de hotkey');
+    }
+
+    this.deps.hotkey.on('pressed', () => this.onPressed());
+    this.deps.hotkey.on('released', () => this.onReleased());
     this.deps.voice.on('transcription', (text: string) => this.onTranscription(text));
     this.deps.voice.on('error', (err: Error) => this.onError(err));
+    this.deps.hotkey.on('error', (err: Error) => this.onError(err));
   }
 
   stop(): void {
-    this.deps.hotkey.unregister();
+    if (!this.isRunning) return;
+    this.isRunning = false;
+    this.deps.hotkey.dispose();
     this.deps.voice.dispose();
     this.deps.notch.dispose();
   }
 
-  private onStartListening(): void {
+  private onPressed(): void {
     this.deps.notch.setState('listening');
     this.deps.voice.startRecording();
   }
 
-  private onStopListening(): void {
+  private onReleased(): void {
     this.deps.notch.setState('processing');
     this.deps.voice.stopRecording();
   }
