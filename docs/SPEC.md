@@ -168,8 +168,13 @@ notch-pill → estado TYPING (verde, ✓) → volta IDLE após 2s
 2. **Hotkey customizável:** fase F6. Inicialmente fixo em `Ctrl+Space`.
 3. **Win32 lib:** `koffi` (recomendado, sem rebuild nativo) vs `ffi-napi` (usado no Mimico). Decisão inicial: `koffi` se funcionar no ambiente; senão `ffi-napi`.
 
-## 11. Referências
+## 11. Design
+
+Veja `docs/DESIGN.md` para tokens, paleta, estados do notch e especificações visuais.
+
+## 12. Referências
 
 - Mimico (`C:\Users\user\Desktop\Mimico`) — WorkerProcess, notch, tray, config.
 - Skill `electron-windows-apps` — padrões Electron + Win32.
 - Skill `clean-code` — SRP, DRY, funções pequenas, boundaries.
+- Skill `design-ui-designer` + `references/electron-overlay-contrast.md` — design system e contrast.
