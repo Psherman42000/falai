@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FALAI — Configurações</title>
+  <style>
+    :root {
+      --surface: #141923;
+      --surface-elevated: #1c212e;
+      --text-primary: rgba(255, 255, 255, 0.93);
+      --text-secondary: rgba(255, 255, 255, 0.72);
+      --text-muted: rgba(255, 255, 255, 0.52);
+      --accent: #7c5cff;
+      --accent-text: #cbb5ff;
+      --border: rgba(255, 255, 255, 0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--surface);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 180px;
+      background: var(--surface-elevated);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 150ms ease;
+    }
+
+    .sidebar-item:hover, .sidebar-item.active {
+      background: rgba(124, 92, 255, 0.15);
+      color: var(--accent-text);
+    }
+
+    .content {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    h1 { font-size: 18px; margin-bottom: 20px; font-weight: 600; }
+
+    .field { margin-bottom: 20px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .field select, .field input {
+      width: 100%;
+      max-width: 320px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+    .field select:focus, .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.15);
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .actions {
+      margin-top: 32px;
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 150ms ease;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-item active" data-section="general">Geral</div>
+    <div class="sidebar-item" data-section="language">Idioma</div>
+    <div class="sidebar-item" data-section="model">Modelo</div>
+    <div class="sidebar-item" data-section="shortcuts">Atalhos</div>
+    <div class="sidebar-item" data-section="about">Sobre</div>
+  </aside>
+
+  <main class="content">
+    <h1>Configurações</h1>
+
+    <section id="general">
+      <div class="field">
+        <label>Posição do notch</label>
+        <select id="notchPosition">
+          <option value="top-center">Topo centro</option>
+          <option value="top-left">Topo esquerda</option>
+          <option value="top-right">Topo direita</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="language">
+      <div class="field">
+        <label>Idioma da transcrição</label>
+        <select id="language">
+          <option value="auto">Auto-detectar</option>
+          <option value="pt">Português</option>
+          <option value="en">Inglês</option>
+          <option value="es">Espanhol</option>
+          <option value="fr">Francês</option>
+        </select>
+        <div class="hint">"Auto" faz o Whisper detectar o idioma automaticamente.</div>
+      </div>
+    </section>
+
+    <section id="model">
+      <div class="field">
+        <label>Modelo Whisper</label>
+        <select id="whisperModel">
+          <option value="tiny">tiny (rápido, menos preciso)</option>
+          <option value="base">base (equilíbrio)</option>
+          <option value="small">small (mais preciso)</option>
+          <option value="medium">medium (melhor, mais lento)</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="shortcuts">
+      <div class="field">
+        <label>Atalho global</label>
+        <input type="text" id="hotkey" value="Ctrl+Space" readonly>
+        <div class="hint">Ainda não customizável nesta versão.</div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="field">
+        <label>Versão</label>
+        <div style="color: var(--text-secondary); font-size: 13px;">0.1.0</div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="primary" id="save">Salvar</button>
+      <button class="secondary" id="cancel">Cancelar</button>
+    </div>
+  </main>
+
+  <script>
+    const sections = document.querySelectorAll('section');
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+
+    sidebarItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.section;
+        sidebarItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        sections.forEach(s => s.style.display = s.id === id ? 'block' : 'none');
+      });
+    });
+
+    sections.forEach(s => s.style.display = s.id === 'general' ? 'block' : 'none');
+  </script>
+</body>
+</html>

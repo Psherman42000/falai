@@ -1,0 +1,53 @@
+{
+  "name": "falai",
+  "version": "0.1.0",
+  "description": "Dictação por voz universal para Windows",
+  "main": "dist/main/main.js",
+  "author": "Pedro",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "lint": "eslint src/ --ext .ts",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "build": {
+    "appId": "com.pedro.falai",
+    "productName": "FALAI",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "workers/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

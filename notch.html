@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FALAI Notch</title>
+  <style>
+    :root {
+      --surface: rgba(20, 25, 35, 0.88);
+      --text-primary: rgba(255, 255, 255, 0.93);
+      --text-secondary: rgba(255, 255, 255, 0.72);
+      --text-muted: rgba(255, 255, 255, 0.52);
+      --accent: #7c5cff;
+      --border: rgba(255, 255, 255, 0.12);
+      --state-listening: #ff4757;
+      --state-processing: #f59e0b;
+      --state-typing: #10e676;
+      --state-error: #c0392b;
+      --state-idle: #6b7280;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 220px;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 17px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 250ms ease;
+    }
+
+    #pill.listening {
+      background: rgba(255, 71, 87, 0.15);
+      border-color: rgba(255, 71, 87, 0.40);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    #pill.processing {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    #pill.typing {
+      background: rgba(16, 230, 118, 0.12);
+      border-color: rgba(16, 230, 118, 0.35);
+    }
+
+    #pill.error {
+      background: rgba(192, 57, 43, 0.18);
+      border-color: rgba(192, 57, 43, 0.45);
+    }
+
+    .left { display: flex; align-items: center; gap: 8px; }
+    .icon { font-size: 14px; }
+    .label { letter-spacing: 0.02em; }
+    .right { color: var(--text-muted); font-size: 12px; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #pill { transition: none; }
+      #pill.listening { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="pill" class="idle">
+    <div class="left">
+      <span class="icon" id="icon">F</span>
+      <span class="label" id="label">FALAI</span>
+    </div>
+    <div class="right" id="detail"></div>
+  </div>
+
+  <script>
+    const pill = document.getElementById('pill');
+    const icon = document.getElementById('icon');
+    const label = document.getElementById('label');
+    const detail = document.getElementById('detail');
+
+    const states = {
+      idle:       { icon: 'F', label: 'FALAI', detail: '' },
+      listening:  { icon: '\ud83c\udf99\ufe0f', label: 'Ouvindo', detail: '00:00' },
+      processing: { icon: '\u23f3', label: 'Processando', detail: '' },
+      typing:     { icon: '\u2713', label: 'Digitado', detail: '' },
+      error:      { icon: '\u2717', label: 'Erro', detail: '' },
+    };
+
+    window.falaiAPI?.loadConfig().catch(() => ({}));
+
+    if (window.require) {
+      const { ipcRenderer } = window.require('electron');
+      ipcRenderer.on('notch-state', (_event, data) => setState(data.state, data.message));
+    }
+
+    function setState(state, message) {
+      const cfg = states[state] || states.idle;
+      pill.className = state;
+      icon.textContent = cfg.icon;
+      label.textContent = cfg.label;
+      detail.textContent = message ?? cfg.detail;
+    }
+  </script>
+</body>
+</html>
