@@ -62,6 +62,7 @@ export class FalaiPipeline extends EventEmitter {
   }
 
   private onPressed(): void {
+    this.deps.injector.captureForegroundWindow();
     this.deps.notch.setState('listening');
     this.deps.voice.startRecording();
   }

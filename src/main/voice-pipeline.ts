@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { ConfigManager } from './config';
@@ -16,6 +17,10 @@ interface WhisperMessage {
 }
 
 function resolvePython(): string {
+  const venvPython = path.join(__dirname, '..', '..', 'workers', 'venv', 'Scripts', 'python.exe');
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
   for (const cmd of ['python', 'py', 'python3']) {
     try {
       execSync(`${cmd} --version`, { stdio: 'ignore', timeout: 5000 });

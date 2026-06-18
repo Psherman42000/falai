@@ -150,10 +150,12 @@ falai/
 | Problema | Solução |
 |----------|---------|
 | `python não é reconhecido` | Reinstale Python com "Add to PATH" marcado |
+| `ModuleNotFoundError: No module named 'pynput'` | O worker está usando Python global em vez do venv. Certifique-se de que `workers/venv` existe e foi criado com `python -m venv venv` + `pip install -r requirements.txt` |
 | `pip` não instala `faster-whisper` | Use Python 3.10+, verifique se o venv está ativo |
 | `koffi` falha no `npm install` | Feche e reabra o terminal como administrador |
 | Pill não aparece | Verifique se outro app está capturando Ctrl+Space |
 | Áudio não grava | Verifique se o microfone está habilitado no Windows |
+| Texto aparece no pill em vez de digitar no cursor | O app perdeu o foco da janela ativa. O `TextInjector` agora captura a janela foreground no `Ctrl+Space` pressionado e restaura antes de digitar. Se ainda falhar, verifique se o app tem permissão de administrador. |
 | Erro de SendInput | Execute como administrador |
 | `electron-builder` falha | Delete `node_modules` e faça `npm install` novamente |
 

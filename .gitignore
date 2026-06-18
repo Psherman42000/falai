@@ -9,3 +9,11 @@ release/
 *.nupkg
 __pycache__/
 *.pyc
+venv/
+__pycache__/
+*.pyc
+.env
+dist/
+release/
+node_modules/
+image.png

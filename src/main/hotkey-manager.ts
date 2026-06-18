@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { ConfigManager } from './config';
@@ -12,10 +13,14 @@ interface HotkeyMessage {
 }
 
 /**
- * Resolve o melhor comando Python disponível no sistema.
- * Tenta: python → py → python3
+ * Resolve o Python do venv local (workers/venv) se existir,
+ * senão tenta python → py → python3 do sistema.
  */
 function resolvePython(): string {
+  const venvPython = path.join(__dirname, '..', '..', 'workers', 'venv', 'Scripts', 'python.exe');
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
   const candidates = ['python', 'py', 'python3'];
   for (const cmd of candidates) {
     try {
