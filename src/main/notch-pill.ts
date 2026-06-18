@@ -1,10 +1,10 @@
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 
-import { ConfigManager, FalaiConfig } from './config';
+import { ConfigManager } from './config';
 
-const PILL_WIDTH = 220;
-const PILL_HEIGHT = 34;
+const PILL_WIDTH = 260;
+const PILL_HEIGHT = 44;
 const MARGIN_X = 20;
 const MARGIN_Y = 12;
 
@@ -12,7 +12,18 @@ export class NotchPill {
   private window: BrowserWindow | null = null;
   private settingsWindow: BrowserWindow | null = null;
 
-  constructor(private config: ConfigManager) {}
+  constructor(private config: ConfigManager) {
+    this.registerIpc();
+  }
+
+  private registerIpc(): void {
+    ipcMain.handle('notch-open-settings', () => this.openSettings());
+    ipcMain.on('notch-quit', () => {
+      this.dispose();
+      // app.quit() is called via tray.onQuit in main.ts, but this also works:
+      import('electron').then(({ app }) => app.quit());
+    });
+  }
 
   show(): void {
     if (this.window && !this.window.isDestroyed()) {
@@ -29,7 +40,7 @@ export class NotchPill {
       skipTaskbar: true,
       resizable: false,
       hasShadow: false,
-      focusable: false,
+      focusable: true,
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -37,9 +48,14 @@ export class NotchPill {
       },
     });
 
-    this.window.setIgnoreMouseEvents(true);
+    // Don't steal focus from the user's active window
+    this.window.setAlwaysOnTop(true, 'floating');
     this.positionWindow();
     this.window.loadFile(path.join(__dirname, '..', '..', 'notch.html'));
+    this.window.on('blur', () => {
+      // Keep notch visible but return focus to previous window
+      this.window?.showInactive();
+    });
   }
 
   setState(state: string, message?: string): void {
@@ -53,8 +69,8 @@ export class NotchPill {
     }
 
     this.settingsWindow = new BrowserWindow({
-      width: 560,
-      height: 420,
+      width: 600,
+      height: 480,
       title: 'Falai — Configurações',
       resizable: false,
       maximizable: false,
@@ -87,24 +103,11 @@ export class NotchPill {
 
   private positionWindow(): void {
     if (!this.window) return;
-    const { notchPosition } = this.config.get();
     const { workArea } = screen.getPrimaryDisplay();
 
-    let x: number;
-    switch (notchPosition) {
-      case 'top-left':
-        x = workArea.x + MARGIN_X;
-        break;
-      case 'top-right':
-        x = workArea.x + workArea.width - PILL_WIDTH - MARGIN_X;
-        break;
-      case 'top-center':
-      default:
-        x = workArea.x + Math.round((workArea.width - PILL_WIDTH) / 2);
-        break;
-    }
-
-    const y = workArea.y + MARGIN_Y;
+    // Bottom center
+    const x = workArea.x + Math.round((workArea.width - PILL_WIDTH) / 2);
+    const y = workArea.y + workArea.height - PILL_HEIGHT - MARGIN_Y;
     this.window.setBounds({ x, y, width: PILL_WIDTH, height: PILL_HEIGHT });
   }
 }
