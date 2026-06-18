@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 
 import { ConfigManager } from './config';
@@ -17,17 +17,24 @@ export class NotchPill {
   }
 
   private registerIpc(): void {
-    ipcMain.handle('notch-open-settings', () => this.openSettings());
+    ipcMain.handle('notch-open-settings', () => {
+      this.openSettings();
+    });
     ipcMain.on('notch-quit', () => {
       this.dispose();
-      // app.quit() is called via tray.onQuit in main.ts, but this also works:
-      import('electron').then(({ app }) => app.quit());
+      app.quit();
     });
+  }
+
+  /** Resolve path to an HTML file relative to the app root, works in both dev and packaged mode. */
+  private resolveHtml(htmlFile: string): string {
+    // app.getAppPath() returns the asar root in production, project root in dev
+    return path.join(app.getAppPath(), 'dist', htmlFile);
   }
 
   show(): void {
     if (this.window && !this.window.isDestroyed()) {
-      this.window.show();
+      this.window.showInactive();
       return;
     }
 
@@ -40,7 +47,8 @@ export class NotchPill {
       skipTaskbar: true,
       resizable: false,
       hasShadow: false,
-      focusable: true,
+      focusable: false,
+      show: false, // Don't show until positioned
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -48,13 +56,19 @@ export class NotchPill {
       },
     });
 
-    // Don't steal focus from the user's active window
-    this.window.setAlwaysOnTop(true, 'floating');
     this.positionWindow();
-    this.window.loadFile(path.join(__dirname, '..', '..', 'notch.html'));
+    this.window.loadFile(this.resolveHtml('notch.html'))
+      .then(() => {
+        this.window?.showInactive();
+      })
+      .catch((err) => {
+        console.error('[notch-pill] Failed to load notch.html:', err);
+        console.error('[notch-pill] Tried path:', this.resolveHtml('notch.html'));
+      });
+
     this.window.on('blur', () => {
-      // Keep notch visible but return focus to previous window
-      this.window?.showInactive();
+      // Window lost activation but should stay visible & on top
+      // No action needed — show: false + showInactive handles the rest
     });
   }
 
@@ -82,7 +96,10 @@ export class NotchPill {
       },
     });
 
-    this.settingsWindow.loadFile(path.join(__dirname, '..', '..', 'settings.html'));
+    this.settingsWindow.loadFile(this.resolveHtml('settings.html'))
+      .catch((err) => {
+        console.error('[notch-pill] Failed to load settings.html:', err);
+      });
     this.settingsWindow.on('closed', () => {
       this.settingsWindow = null;
     });
