@@ -18,9 +18,10 @@ interface WorkerResolved {
 }
 
 function resolveHotkeyWorker(): WorkerResolved {
-  // Production: extraResources copies workers/ to resources/workers/
+  // Production: extraResources copies dist/workers/ to resources/workers/
+  // PyInstaller --onedir creates subdirectory with .exe + .dll/.pyd files
   if (process.resourcesPath) {
-    const exePath = path.join(process.resourcesPath, 'workers', 'hotkey_worker.exe');
+    const exePath = path.join(process.resourcesPath, 'workers', 'hotkey_worker', 'hotkey_worker.exe');
     if (fs.existsSync(exePath)) {
       return { command: exePath, args: [] };
     }

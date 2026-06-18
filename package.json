@@ -35,6 +35,7 @@
       "workers/**/*",
       "assets/**/*",
       "package.json",
+      "!dist/workers/**",
       "!workers/venv/**",
       "!workers/build_*/**",
       "!workers/*.spec"

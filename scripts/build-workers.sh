@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Build Python workers as standalone .exe using PyInstaller
+# Build Python workers as standalone .exe using PyInstaller (--onedir for fast startup)
 # Output: dist/workers/whisper_worker.exe, dist/workers/hotkey_worker.exe
+# Dependencies extracted to subdirectories at build time, not at runtime.
 
 set -euo pipefail
 
@@ -23,9 +24,9 @@ echo "[build-workers] Cleaning old build..."
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-echo "[build-workers] Building whisper_worker.exe..."
+echo "[build-workers] Building whisper_worker.exe (onedir)..."
 "$VENV_PYTHON" -m PyInstaller \
-  --onefile \
+  --onedir \
   --name whisper_worker \
   --distpath "$DIST_DIR" \
   --workpath "$WORKERS_DIR/build_whisper" \
@@ -41,9 +42,9 @@ echo "[build-workers] Building whisper_worker.exe..."
   --noconfirm \
   "$WORKERS_DIR/whisper_worker.py"
 
-echo "[build-workers] Building hotkey_worker.exe..."
+echo "[build-workers] Building hotkey_worker.exe (onedir)..."
 "$VENV_PYTHON" -m PyInstaller \
-  --onefile \
+  --onedir \
   --name hotkey_worker \
   --distpath "$DIST_DIR" \
   --workpath "$WORKERS_DIR/build_hotkey" \
@@ -60,4 +61,4 @@ rm -rf "$WORKERS_DIR/build_whisper" "$WORKERS_DIR/build_hotkey"
 rm -f "$WORKERS_DIR/whisper_worker.spec" "$WORKERS_DIR/hotkey_worker.spec"
 
 echo "[build-workers] Done. Workers at: $DIST_DIR"
-ls -la "$DIST_DIR"
+ls -lh "$DIST_DIR" "$DIST_DIR/whisper_worker/" "$DIST_DIR/hotkey_worker/"
