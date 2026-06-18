@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 
-import { ConfigManager } from './config';
+import { ConfigManager, FalaiConfig } from './config';
 
 const PILL_WIDTH = 260;
 const PILL_HEIGHT = 44;
@@ -14,6 +14,7 @@ export class NotchPill {
 
   constructor(private config: ConfigManager) {
     this.registerIpc();
+    this.config.on('changed', () => this.positionWindow());
   }
 
   private registerIpc(): void {
@@ -121,10 +122,30 @@ export class NotchPill {
   private positionWindow(): void {
     if (!this.window) return;
     const { workArea } = screen.getPrimaryDisplay();
+    const { notchPosition } = this.config.get();
 
-    // Bottom center
-    const x = workArea.x + Math.round((workArea.width - PILL_WIDTH) / 2);
-    const y = workArea.y + workArea.height - PILL_HEIGHT - MARGIN_Y;
+    let x: number;
+    switch (notchPosition) {
+      case 'top-left':
+      case 'bottom-left':
+        x = workArea.x + MARGIN_X;
+        break;
+      case 'top-right':
+      case 'bottom-right':
+        x = workArea.x + workArea.width - PILL_WIDTH - MARGIN_X;
+        break;
+      case 'top-center':
+      case 'bottom-center':
+      default:
+        x = workArea.x + Math.round((workArea.width - PILL_WIDTH) / 2);
+        break;
+    }
+
+    const isBottom = notchPosition?.startsWith('bottom');
+    const y = isBottom
+      ? workArea.y + workArea.height - PILL_HEIGHT - MARGIN_Y
+      : workArea.y + MARGIN_Y;
+
     this.window.setBounds({ x, y, width: PILL_WIDTH, height: PILL_HEIGHT });
   }
 }

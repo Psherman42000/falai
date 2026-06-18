@@ -6,7 +6,7 @@ export function registerWindowIpc(): void {
   });
 
   ipcMain.on('window-close', (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.hide();
+    BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
   ipcMain.on('app-quit', () => {

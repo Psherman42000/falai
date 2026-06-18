@@ -9,7 +9,7 @@ export interface FalaiConfig {
   language: 'auto' | string;
   whisperModel: WhisperModelName;
   hotkey: string;
-  notchPosition: 'top-center' | 'top-left' | 'top-right';
+  notchPosition: 'top-center' | 'top-left' | 'top-right' | 'bottom-center' | 'bottom-left' | 'bottom-right';
   formatText: boolean;
 }
 
@@ -17,7 +17,7 @@ const DEFAULTS: FalaiConfig = {
   language: 'auto',
   whisperModel: 'base',
   hotkey: 'Ctrl+Space',
-  notchPosition: 'top-center',
+  notchPosition: 'bottom-center',
   formatText: true,
 };
 
