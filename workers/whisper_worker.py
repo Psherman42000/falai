@@ -129,20 +129,48 @@ class WhisperWorker:
                 return
 
         try:
-            duration = len(self.audio_buffer) / SAMPLE_RATE
-            log(f"Transcrevendo {duration:.1f}s de áudio...")
-            segments, info = self.model.transcribe(
-                self.audio_buffer,
-                language=self.language,
-                beam_size=5,
-                vad_filter=False,
-            )
-            text = " ".join(seg.text.strip() for seg in segments).strip()
-            log(f"Transcrição: '{text[:80]}{'...' if len(text) > 80 else ''}' ({info.language}, {info.duration:.1f}s)")
+            total_duration = len(self.audio_buffer) / SAMPLE_RATE
+            log(f"Transcrevendo {total_duration:.1f}s de áudio...")
+
+            # Whisper base tem contexto limitado (~30s). Chunk em 25s com 2s overlap.
+            CHUNK_DURATION = 25.0
+            OVERLAP_DURATION = 2.0
+            chunk_samples = int(CHUNK_DURATION * SAMPLE_RATE)
+            overlap_samples = int(OVERLAP_DURATION * SAMPLE_RATE)
+
+            all_texts: list[str] = []
+            detected_language = self.language
+
+            start = 0
+            while start < len(self.audio_buffer):
+                end = min(start + chunk_samples, len(self.audio_buffer))
+                chunk = self.audio_buffer[start:end]
+
+                segments, info = self.model.transcribe(
+                    chunk,
+                    language=detected_language,
+                    beam_size=5,
+                    vad_filter=False,
+                    condition_on_previous_text=False,  # evita acumulo de erro entre chunks
+                )
+                chunk_text = " ".join(seg.text.strip() for seg in segments).strip()
+                if chunk_text:
+                    all_texts.append(chunk_text)
+                if detected_language is None:
+                    detected_language = info.language
+
+                log(f"  Chunk {start/SAMPLE_RATE:.1f}s-{end/SAMPLE_RATE:.1f}s: '{chunk_text[:60]}{'...' if len(chunk_text) > 60 else ''}'")
+
+                if end >= len(self.audio_buffer):
+                    break
+                start = end - overlap_samples  # overlap para não perder palavras no corte
+
+            full_text = " ".join(all_texts).strip()
+            log(f"Transcrição completa: '{full_text[:100]}{'...' if len(full_text) > 100 else ''}'")
             send("transcription", {
-                "text": text,
-                "language": info.language,
-                "duration": info.duration,
+                "text": full_text,
+                "language": detected_language or "",
+                "duration": total_duration,
             })
         except Exception as exc:
             log(f"Erro na transcrição: {exc}")
