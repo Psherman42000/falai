@@ -22,10 +22,12 @@ interface WorkerResolved {
 }
 
 function resolveWhisperWorker(): WorkerResolved {
-  // Production: use packaged .exe from dist/workers/
-  const exePath = path.join(__dirname, '..', 'workers', 'whisper_worker.exe');
-  if (fs.existsSync(exePath)) {
-    return { command: exePath, args: [] };
+  // Production: extraResources copies workers/ to resources/workers/
+  if (process.resourcesPath) {
+    const exePath = path.join(process.resourcesPath, 'workers', 'whisper_worker.exe');
+    if (fs.existsSync(exePath)) {
+      return { command: exePath, args: [] };
+    }
   }
 
   // Dev: use venv python + script

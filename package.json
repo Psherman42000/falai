@@ -60,7 +60,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "FALAI-Setup-${version}.exe"
+      "shortcutName": "FALAI",
+      "artifactName": "FALAI-Setup-${version}.exe",
+      "installerHeaderIcon": "assets/icon.ico"
     }
   }
 }
