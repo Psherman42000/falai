@@ -6,8 +6,10 @@ Protocolo: JSON lines via stdin/stdout.
 """
 
 import base64
+import gc
 import io
 import json
+import re
 import sys
 import traceback
 from typing import Any
@@ -29,6 +31,46 @@ def send(event: str, payload: dict[str, Any]) -> None:
     print(json.dumps({"event": event, **payload}), flush=True)
 
 
+# ---------------------------------------------------------------------------
+# Text formatting — small functions, each does one thing (Clean Code Ch3)
+# ---------------------------------------------------------------------------
+
+def _normalize_spaces(text: str) -> str:
+    """Colapsa espaços múltiplos e remove espaço antes de pontuação."""
+    text = re.sub(r'\s+', ' ', text).strip()
+    return re.sub(r'\s+([.,;:!?])', r'\1', text)
+
+
+def _capitalize_sentences(text: str) -> str:
+    """Capitaliza primeira letra de cada frase."""
+    sentences = re.split(r'([.!?]\s+)', text)
+    for i, part in enumerate(sentences):
+        if i % 2 == 0 and part:
+            sentences[i] = part[0].upper() + part[1:]
+    return ''.join(sentences)
+
+
+def _ensure_terminal_punctuation(text: str) -> str:
+    """Adiciona ponto final se não houver pontuação terminal."""
+    if text and text[-1] not in '.!?':
+        return text + '.'
+    return text
+
+
+def format_transcription(text: str) -> str:
+    """Pós-processa texto cru do Whisper: espaços, capitalização, pontuação."""
+    if not text:
+        return text
+    text = _normalize_spaces(text)
+    text = _capitalize_sentences(text)
+    text = _ensure_terminal_punctuation(text)
+    return text
+
+
+# ---------------------------------------------------------------------------
+# WhisperWorker
+# ---------------------------------------------------------------------------
+
 class WhisperWorker:
     def __init__(self) -> None:
         self.model: WhisperModel | None = None
@@ -37,6 +79,7 @@ class WhisperWorker:
         self.recording = False
         self.language: str | None = None
         self.stream: sd.InputStream | None = None
+        self.format_text: bool = True
 
     def _ensure_stream(self) -> bool:
         if self.stream is not None:
@@ -68,16 +111,28 @@ class WhisperWorker:
         finally:
             self.stream = None
 
+    def unload_model(self) -> None:
+        """Descarrega modelo atual da RAM."""
+        if self.model is None:
+            return
+        log(f"Descarregando modelo '{self.model_name}'...")
+        del self.model
+        self.model = None
+        self.model_name = None
+        gc.collect()
+        log("Modelo anterior descarregado.")
+
     def load_model(self, model_name: str) -> bool:
         if model_name not in SUPPORTED_MODELS:
             send("error", {"message": f"Modelo não suportado: {model_name}"})
             return False
 
-        if self.model and self.model_name == model_name:
+        if self.model is not None and self.model_name == model_name:
             send("status", {"status": "model_loaded", "model": model_name})
             return True
 
         try:
+            self.unload_model()
             log(f"Carregando modelo '{model_name}'...")
             self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
             self.model_name = model_name
@@ -90,7 +145,7 @@ class WhisperWorker:
             send("error", {"message": str(exc)})
             return False
 
-    def start_recording(self, language: str | None = None) -> None:
+    def start_recording(self, language: str | None = None, format_text: bool = True) -> None:
         if not self._ensure_stream():
             return
         if self.model is None:
@@ -99,6 +154,7 @@ class WhisperWorker:
                 send("error", {"message": "Não foi possível carregar modelo para gravação"})
                 return
         self.language = language if language != "auto" else None
+        self.format_text = format_text
         self.audio_buffer = np.array([], dtype=np.float32)
         self.recording = True
         send("status", {"status": "listening"})
@@ -166,9 +222,10 @@ class WhisperWorker:
                 start = end - overlap_samples  # overlap para não perder palavras no corte
 
             full_text = " ".join(all_texts).strip()
-            log(f"Transcrição completa: '{full_text[:100]}{'...' if len(full_text) > 100 else ''}'")
+            final_text = format_transcription(full_text) if self.format_text else full_text
+            log(f"Transcrição completa: '{final_text[:100]}{'...' if len(final_text) > 100 else ''}'")
             send("transcription", {
-                "text": full_text,
+                "text": final_text,
                 "language": detected_language or "",
                 "duration": total_duration,
             })
@@ -209,7 +266,10 @@ def main() -> None:
                 if cmd == "load_model":
                     worker.load_model(msg.get("model", DEFAULT_MODEL))
                 elif cmd == "start_recording":
-                    worker.start_recording(msg.get("language"))
+                    worker.start_recording(
+                        language=msg.get("language"),
+                        format_text=msg.get("format_text", True),
+                    )
                 elif cmd == "stop_recording":
                     worker.stop_recording()
                 elif cmd == "shutdown":
