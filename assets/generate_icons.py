@@ -35,14 +35,21 @@ def draw_f(size):
 
 
 def main():
-    for name, size in [("icon_16.png", 16), ("icon_32.png", 32), ("icon_48.png", 48), ("icon_256.png", 256)]:
+    sizes = [16, 24, 32, 48, 64, 128, 256]
+    for name, size in [(f"icon_{s}.png", s) for s in sizes]:
         img = draw_f(size)
         img.save(os.path.join(HERE, name))
         print(f"Generated {name}")
 
-    # ICO para o instalador/app (256x256 mínimo).
-    draw_f(256).save(os.path.join(HERE, "icon.ico"), format='ICO')
-    print("Generated icon.ico")
+    # ICO com múltiplos tamanhos — usar BMP format para compatibilidade com rcedit
+    icon_images = [draw_f(s) for s in sizes]
+    icon_images[-1].save(
+        os.path.join(HERE, "icon.ico"),
+        format='ICO',
+        sizes=[(s, s) for s in sizes],
+        bitmap_format='bmp',
+    )
+    print("Generated icon.ico with sizes:", sizes)
 
 
 if __name__ == "__main__":

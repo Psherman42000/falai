@@ -101,11 +101,11 @@ export class WorkerProcess extends EventEmitter {
       const detail = this.stderrBuffer.trim();
       const msg = detail
         ? `${this.label} não respondeu (stderr: ${detail})`
-        : `${this.label} não respondeu em 10s — verifique se Python e dependências estão instalados`;
+        : `${this.label} não respondeu em 60s — verifique se o antivírus não está bloqueando`;
       console.error(`[${this.label}] ${msg}`);
       this.emit('error', new Error(msg));
       resolve(false);
-    }, 10000);
+    }, 60000);
     const onReady = (msg: Record<string, unknown>) => {
       if (msg.event !== 'ready') return;
       clearTimeout(timeout);
