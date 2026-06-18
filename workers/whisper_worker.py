@@ -113,6 +113,10 @@ class WhisperWorker:
         if not self.recording:
             return
         self.audio_buffer = np.concatenate((self.audio_buffer, chunk))
+        # Log a cada 5 segundos de áudio acumulado
+        duration = len(self.audio_buffer) / SAMPLE_RATE
+        if int(duration) % 5 == 0 and duration > 0:
+            log(f"Áudio acumulado: {duration:.1f}s")
 
     def _transcribe_buffer(self) -> None:
         if self.audio_buffer.size == 0:
@@ -125,18 +129,16 @@ class WhisperWorker:
                 return
 
         try:
+            duration = len(self.audio_buffer) / SAMPLE_RATE
+            log(f"Transcrevendo {duration:.1f}s de áudio...")
             segments, info = self.model.transcribe(
                 self.audio_buffer,
                 language=self.language,
                 beam_size=5,
-                vad_filter=True,
-                vad_parameters=dict(
-                    threshold=0.5,
-                    min_speech_duration_ms=250,
-                    min_silence_duration_ms=350,
-                ),
+                vad_filter=False,
             )
             text = " ".join(seg.text.strip() for seg in segments).strip()
+            log(f"Transcrição: '{text[:80]}{'...' if len(text) > 80 else ''}' ({info.language}, {info.duration:.1f}s)")
             send("transcription", {
                 "text": text,
                 "language": info.language,
