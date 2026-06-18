@@ -1,6 +1,6 @@
 {
   "name": "falai",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Dictação por voz universal para Windows",
   "main": "dist/main/main.js",
   "author": "Pedro",
@@ -10,7 +10,8 @@
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --dev",
     "lint": "eslint src/ --ext .ts",
-    "dist:win": "npm run build && electron-builder --win"
+    "build:workers": "bash scripts/build-workers.sh",
+    "dist:win": "npm run build && npm run build:workers && electron-builder --win"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -33,7 +34,16 @@
       "dist/**/*",
       "workers/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "!workers/venv/**",
+      "!workers/build_*/**",
+      "!workers/*.spec"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/workers",
+        "to": "workers"
+      }
     ],
     "win": {
       "icon": "assets/icon.ico",

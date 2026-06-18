@@ -16,16 +16,36 @@ interface WhisperMessage {
   message?: string;
 }
 
-function resolvePython(): string {
+interface WorkerResolved {
+  command: string;
+  args: string[];
+}
+
+function resolveWhisperWorker(): WorkerResolved {
+  // Production: use packaged .exe from dist/workers/
+  const exePath = path.join(__dirname, '..', 'workers', 'whisper_worker.exe');
+  if (fs.existsSync(exePath)) {
+    return { command: exePath, args: [] };
+  }
+
+  // Dev: use venv python + script
   const venvPython = path.join(__dirname, '..', '..', 'workers', 'venv', 'Scripts', 'python.exe');
-  if (fs.existsSync(venvPython)) return venvPython;
+  if (fs.existsSync(venvPython)) {
+    const script = path.join(__dirname, '..', '..', 'workers', 'whisper_worker.py');
+    return { command: venvPython, args: [script] };
+  }
+
+  // Fallback: system python + script
   for (const cmd of ['python', 'py', 'python3']) {
     try {
       execSync(`${cmd} --version`, { stdio: 'ignore', timeout: 5000 });
-      return cmd;
+      const script = path.join(__dirname, '..', '..', 'workers', 'whisper_worker.py');
+      return { command: cmd, args: [script] };
     } catch { /* next */ }
   }
-  return 'python';
+
+  const script = path.join(__dirname, '..', '..', 'workers', 'whisper_worker.py');
+  return { command: 'python', args: [script] };
 }
 
 export class VoicePipeline extends EventEmitter {
@@ -35,12 +55,11 @@ export class VoicePipeline extends EventEmitter {
 
   constructor(private config: ConfigManager) {
     super();
-    const pythonCmd = resolvePython();
-    const script = path.join(__dirname, '..', '..', 'workers', 'whisper_worker.py');
-    console.log(`[voice-pipeline] Python: ${pythonCmd} | Script: ${script}`);
+    const resolved = resolveWhisperWorker();
+    console.log(`[voice-pipeline] Command: ${resolved.command} | Args: ${resolved.args.join(' ')}`);
     this.worker = new WorkerProcess({
-      command: pythonCmd,
-      args: [script],
+      command: resolved.command,
+      args: resolved.args,
       env: { PYTHONIOENCODING: 'utf-8' },
       label: 'voice',
     });

@@ -12,40 +12,51 @@ interface HotkeyMessage {
   message?: string;
 }
 
-/**
- * Resolve o Python do venv local (workers/venv) se existir,
- * senão tenta python → py → python3 do sistema.
- */
-function resolvePython(): string {
+interface WorkerResolved {
+  command: string;
+  args: string[];
+}
+
+function resolveHotkeyWorker(): WorkerResolved {
+  // Production: use packaged .exe from dist/workers/
+  const exePath = path.join(__dirname, '..', 'workers', 'hotkey_worker.exe');
+  if (fs.existsSync(exePath)) {
+    return { command: exePath, args: [] };
+  }
+
+  // Dev: use venv python + script
   const venvPython = path.join(__dirname, '..', '..', 'workers', 'venv', 'Scripts', 'python.exe');
   if (fs.existsSync(venvPython)) {
-    return venvPython;
+    const script = path.join(__dirname, '..', '..', 'workers', 'hotkey_worker.py');
+    return { command: venvPython, args: [script] };
   }
-  const candidates = ['python', 'py', 'python3'];
-  for (const cmd of candidates) {
+
+  // Fallback: system python + script
+  for (const cmd of ['python', 'py', 'python3']) {
     try {
       execSync(`${cmd} --version`, { stdio: 'ignore', timeout: 5000 });
-      return cmd;
-    } catch {
-      // tenta próximo
-    }
+      const script = path.join(__dirname, '..', '..', 'workers', 'hotkey_worker.py');
+      return { command: cmd, args: [script] };
+    } catch { /* next */ }
   }
-  return 'python'; // fallback final
+
+  const script = path.join(__dirname, '..', '..', 'workers', 'hotkey_worker.py');
+  return { command: 'python', args: [script] };
 }
 
 export class HotkeyManager extends EventEmitter {
   private worker: WorkerProcess;
-  private pythonCmd: string;
 
   constructor(private config: ConfigManager) {
     super();
-    this.pythonCmd = resolvePython();
-    const script = path.join(__dirname, '..', '..', 'workers', 'hotkey_worker.py');
     const combo = this.config.get().hotkey;
-    console.log(`[hotkey-manager] Python: ${this.pythonCmd} | Script: ${script} | Combo: ${combo}`);
+    const resolved = resolveHotkeyWorker();
+    // Pass combo as first arg for both .exe and python script
+    resolved.args.push(combo);
+    console.log(`[hotkey-manager] Command: ${resolved.command} | Args: ${resolved.args.join(' ')} | Combo: ${combo}`);
     this.worker = new WorkerProcess({
-      command: this.pythonCmd,
-      args: [script, combo],
+      command: resolved.command,
+      args: resolved.args,
       env: { PYTHONIOENCODING: 'utf-8' },
       label: 'hotkey',
     });
