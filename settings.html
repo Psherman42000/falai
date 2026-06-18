@@ -158,12 +158,17 @@
     <section id="model">
       <div class="field">
         <label>Modelo Whisper</label>
-        <select id="whisperModel">
-          <option value="tiny">tiny (rápido, menos preciso)</option>
-          <option value="base">base (equilíbrio)</option>
-          <option value="small">small (mais preciso)</option>
-          <option value="medium">medium (melhor, mais lento)</option>
+        <select id="whisperModel"></select>
+        <div class="hint" id="whisperModelHint"></div>
+      </div>
+
+      <div class="field">
+        <label>Formatação automática</label>
+        <select id="formatText">
+          <option value="true">Ativada — capitaliza, pontua, normaliza espaços</option>
+          <option value="false">Desativada — texto cru do Whisper</option>
         </select>
+        <div class="hint">Desative se preferir transcrição literal sem alterações.</div>
       </div>
     </section>
 
@@ -194,9 +199,33 @@
     const notchPosition = document.getElementById('notchPosition');
     const language = document.getElementById('language');
     const whisperModel = document.getElementById('whisperModel');
+    const whisperModelHint = document.getElementById('whisperModelHint');
+    const formatTextSelect = document.getElementById('formatText');
     const hotkey = document.getElementById('hotkey');
     const saveBtn = document.getElementById('save');
     const cancelBtn = document.getElementById('cancel');
+
+    // Populate whisper model options dynamically
+    const WHISPER_MODELS = [
+      { value: 'tiny',     hint: '39 MB, rápido, menos preciso' },
+      { value: 'base',     hint: '74 MB, equilíbrio (padrão)' },
+      { value: 'small',    hint: '244 MB, mais preciso' },
+      { value: 'medium',   hint: '769 MB, melhor, mais lento' },
+      { value: 'large',    hint: '1.5 GB, alta qualidade' },
+      { value: 'large-v3', hint: '2.9 GB, melhor qualidade' },
+    ];
+
+    WHISPER_MODELS.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.value;
+      opt.textContent = `${m.value} — ${m.hint}`;
+      whisperModel.appendChild(opt);
+    });
+
+    whisperModel.addEventListener('change', () => {
+      const selected = WHISPER_MODELS.find(m => m.value === whisperModel.value);
+      whisperModelHint.textContent = selected?.hint || '';
+    });
 
     sidebarItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -214,7 +243,12 @@
         const cfg = await window.falaiAPI.loadConfig();
         if (cfg.notchPosition) notchPosition.value = cfg.notchPosition;
         if (cfg.language) language.value = cfg.language;
-        if (cfg.whisperModel) whisperModel.value = cfg.whisperModel;
+        if (cfg.whisperModel) {
+          whisperModel.value = cfg.whisperModel;
+          const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
+          whisperModelHint.textContent = selected?.hint || '';
+        }
+        if (cfg.formatText !== undefined) formatTextSelect.value = String(cfg.formatText);
         if (cfg.hotkey) hotkey.value = cfg.hotkey;
       } catch (err) {
         console.error('Erro ao carregar config:', err);
@@ -227,6 +261,7 @@
           notchPosition: notchPosition.value,
           language: language.value,
           whisperModel: whisperModel.value,
+          formatText: formatTextSelect.value === 'true',
           hotkey: hotkey.value,
         });
         window.falaiAPI.closeWindow();

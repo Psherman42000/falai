@@ -3,11 +3,14 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { WhisperModelName } from './whisper-models';
+
 export interface FalaiConfig {
   language: 'auto' | string;
-  whisperModel: 'tiny' | 'base' | 'small' | 'medium';
+  whisperModel: WhisperModelName;
   hotkey: string;
   notchPosition: 'top-center' | 'top-left' | 'top-right';
+  formatText: boolean;
 }
 
 const DEFAULTS: FalaiConfig = {
@@ -15,6 +18,7 @@ const DEFAULTS: FalaiConfig = {
   whisperModel: 'base',
   hotkey: 'Ctrl+Space',
   notchPosition: 'top-center',
+  formatText: true,
 };
 
 export class ConfigManager extends EventEmitter {
