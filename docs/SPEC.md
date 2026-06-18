@@ -99,6 +99,9 @@ notch-pill → estado TYPING (verde, ✓) → volta IDLE após 2s
 - Envia comando `start_recording` / `stop_recording` via stdin JSON.
 - Recebe eventos `audio_chunk`, `transcription`, `error`.
 - Mantém modelo carregado na memória (warm).
+- **Hot-reload:** reage a `config.on('changed')` e envia `load_model` se o modelo mudar — sem reiniciar o app.
+- **formatText:** envia flag `format_text` no `start_recording` para ligar/desligar formatação.
+- Rastreia `currentModel` para evitar recargas desnecessárias.
 
 ### 5.5 TextInjector
 - `typeText(text: string): Promise<void>`.
@@ -118,9 +121,29 @@ notch-pill → estado TYPING (verde, ✓) → volta IDLE após 2s
     "language": "auto",
     "whisperModel": "base",
     "hotkey": "Ctrl+Space",
-    "notchPosition": "top-center"
+    "notchPosition": "top-center",
+    "formatText": true
   }
   ```
+- Modelos suportados: tiny, base, small, medium, large, large-v3.
+- Fonte única de verdade: `src/main/whisper-models.ts` (tipo `WhisperModelName` + array `WHISPER_MODELS`).
+- `formatText` controla formatação de texto (capitalização, pontuação, espaços).
+
+## 5.8 Text Formatting
+
+- Pipeline de pós-processamento no worker Python.
+- Funções pequenas com SRP (Clean Code Ch3):
+  - `_normalize_spaces()` — colapsa espaços múltiplos, remove espaço antes de pontuação.
+  - `_capitalize_sentences()` — capitaliza primeira letra de cada frase.
+  - `_ensure_terminal_punctuation()` — adiciona ponto final se faltar.
+- Orquestrada por `format_transcription()`.
+- Toggle via config `formatText` (default: `true`).
+
+## 5.9 Model Hot-Reload
+
+- Worker descarrega modelo anterior da RAM antes de carregar novo (`unload_model()` + `gc.collect()`).
+- `VoicePipeline` envia `load_model` automaticamente quando config muda.
+- `currentModel` tracking evita recargas desnecessárias.
 
 ## 6. Idioma
 
@@ -147,7 +170,8 @@ notch-pill → estado TYPING (verde, ✓) → volta IDLE após 2s
 - **F4 — TextInjector:** SendInput Win32.
 - **F5 — NotchPill:** overlay com 5 estados.
 - **F6 — Config + Settings:** idioma, modelo, hotkey.
-- **F7 — Polish + Build:** tray, stealth mode, instalador NSIS.
+- **F7 — Modelo + Formatação:** hot-reload de modelo, formatação de texto, toggle nas Settings, suporte a 5min áudio.
+- **F8 — Polish + Build:** tray, stealth mode, instalador NSIS.
 
 ## 9. Dependências
 
