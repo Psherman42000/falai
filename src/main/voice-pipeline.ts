@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ConfigManager } from './config';
+import { ConfigManager, FalaiConfig } from './config';
 import { WorkerProcess } from './worker-process';
 
 interface WhisperMessage {
@@ -18,9 +18,7 @@ interface WhisperMessage {
 
 function resolvePython(): string {
   const venvPython = path.join(__dirname, '..', '..', 'workers', 'venv', 'Scripts', 'python.exe');
-  if (fs.existsSync(venvPython)) {
-    return venvPython;
-  }
+  if (fs.existsSync(venvPython)) return venvPython;
   for (const cmd of ['python', 'py', 'python3']) {
     try {
       execSync(`${cmd} --version`, { stdio: 'ignore', timeout: 5000 });
@@ -33,6 +31,7 @@ function resolvePython(): string {
 export class VoicePipeline extends EventEmitter {
   private worker: WorkerProcess;
   private started = false;
+  private currentModel: string | null = null;
 
   constructor(private config: ConfigManager) {
     super();
@@ -47,6 +46,14 @@ export class VoicePipeline extends EventEmitter {
     });
     this.worker.on('message', (msg: WhisperMessage) => this.handleMessage(msg));
     this.worker.on('error', (err: Error) => this.emit('error', err));
+
+    this.config.on('changed', (cfg: FalaiConfig) => this.onConfigChanged(cfg));
+  }
+
+  private onConfigChanged(cfg: FalaiConfig): void {
+    if (cfg.whisperModel && cfg.whisperModel !== this.currentModel) {
+      this.worker.send({ cmd: 'load_model', model: cfg.whisperModel });
+    }
   }
 
   async start(): Promise<boolean> {
@@ -54,19 +61,19 @@ export class VoicePipeline extends EventEmitter {
     const ready = await this.worker.start();
     if (!ready) return false;
 
-    this.worker.send({
-      cmd: 'load_model',
-      model: this.config.get().whisperModel,
-    });
+    const modelName = this.config.get().whisperModel;
+    this.currentModel = modelName;
+    this.worker.send({ cmd: 'load_model', model: modelName });
     this.started = true;
     return true;
   }
 
   startRecording(): void {
-    const lang = this.config.get().language;
+    const cfg = this.config.get();
     this.worker.send({
       cmd: 'start_recording',
-      language: lang === 'auto' ? null : lang,
+      language: cfg.language === 'auto' ? null : cfg.language,
+      format_text: cfg.formatText,
     });
   }
 
@@ -86,6 +93,11 @@ export class VoicePipeline extends EventEmitter {
     }
     if (msg.event === 'error' && msg.message) {
       this.emit('error', new Error(msg.message));
+      return;
+    }
+    if (msg.event === 'status' && msg.status === 'model_loaded' && msg.model) {
+      this.currentModel = msg.model;
+      this.emit('status', msg.status);
       return;
     }
     if (msg.event === 'status' && msg.status) {
