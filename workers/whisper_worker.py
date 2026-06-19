@@ -206,7 +206,7 @@ class WhisperWorker:
                     chunk,
                     language=detected_language,
                     beam_size=5,
-                    vad_filter=False,
+                    vad_filter=True,
                     condition_on_previous_text=False,  # evita acumulo de erro entre chunks
                 )
                 chunk_text = " ".join(seg.text.strip() for seg in segments).strip()

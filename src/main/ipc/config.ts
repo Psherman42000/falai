@@ -48,3 +48,6 @@ export function registerConfigIpc(config: ConfigManager): void {
     }
   });
 }
+Olá 1, 2, 3, você está conseguindo me ouvir melhor? Chamado, Sp
+
+Tá amor, então parece que esse medium tá performando melhor, mas agora eu preciso descobrir se ele consegue aguentar longos períodos de tempo falando também, porque vai que uma pessoa pega, tá empolgada falando, falando, falando no cara de coisa né, e aí pega e do nada ele dá problema porque ele não tá preparado pra grandes pedaços de trecho de áudio. De áudio. Ele fica me cheirando com essa boca molhada dele. Mas está tudo bem que agora nós já alcançamos 30 segundos.
