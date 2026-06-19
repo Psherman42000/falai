@@ -78,9 +78,12 @@ export class NotchPill {
   }
 
   openSettings(): void {
+    // Always reload: close previous window fully, then create fresh
     if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
-      this.settingsWindow.focus();
-      return;
+      // Force close + cleanup before reopening
+      this.settingsWindow.removeAllListeners('closed');
+      this.settingsWindow.close();
+      this.settingsWindow = null;
     }
 
     this.settingsWindow = new BrowserWindow({
