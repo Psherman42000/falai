@@ -244,21 +244,23 @@
     async function loadConfig() {
       try {
         const cfg = await window.falaiAPI.loadConfig();
-        console.log('[settings] loaded config:', JSON.stringify(cfg));
         if (!cfg) return;
 
-        // DEBUG: visual debug — shows what config was loaded
-        alert('CONFIG RECEBIDO:\n' + JSON.stringify(cfg, null, 2) + '\n\nlanguage: ' + cfg.language);
+        // Set ALL fields individually with error isolation
+        try { notchPosition.value = cfg.notchPosition ?? 'bottom-center'; } catch(e) { console.error('notchPosition:', e); }
+        try { language.value = cfg.language ?? 'auto'; } catch(e) { console.error('language:', e); }
+        try {
+          if (cfg.whisperModel) {
+            whisperModel.value = cfg.whisperModel;
+            const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
+            whisperModelHint.textContent = selected?.hint || '';
+          }
+        } catch(e) { console.error('whisperModel:', e); }
+        try { formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true'; } catch(e) { console.error('formatText:', e); }
+        try { hotkey.value = cfg.hotkey ?? 'Ctrl+Space'; } catch(e) { console.error('hotkey:', e); }
 
-        notchPosition.value = cfg.notchPosition ?? 'bottom-center';
-        language.value = cfg.language ?? 'auto';
-        if (cfg.whisperModel) {
-          whisperModel.value = cfg.whisperModel;
-          const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
-          whisperModelHint.textContent = selected?.hint || '';
-        }
-        formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
-        hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
+        // DEBUG: verify what actually got set
+        alert('DEPOIS DE APLICAR:\nlanguage.value = ' + JSON.stringify(language.value) + '\nnotchPosition.value = ' + JSON.stringify(notchPosition.value));
       } catch (err) {
         console.error('[settings] Erro ao carregar config:', err);
       }
