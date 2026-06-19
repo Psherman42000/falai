@@ -121,7 +121,7 @@
 <body>
   <aside class="sidebar">
     <div class="sidebar-item active" data-section="general">Geral</div>
-    <div class="sidebar-item" data-section="language">Idioma</div>
+    <div class="sidebar-item" data-section="language-section">Idioma</div>
     <div class="sidebar-item" data-section="model">Modelo</div>
     <div class="sidebar-item" data-section="shortcuts">Atalhos</div>
     <div class="sidebar-item" data-section="about">Sobre</div>
@@ -144,10 +144,10 @@
       </div>
     </section>
 
-    <section id="language">
+    <section id="language-section">
       <div class="field">
         <label>Idioma da transcrição</label>
-        <select id="language">
+        <select id="langSelect">
           <option value="auto">Auto-detectar</option>
           <option value="pt">Português</option>
           <option value="en">Inglês</option>
@@ -186,7 +186,7 @@
     <section id="about">
       <div class="field">
         <label>Versão</label>
-        <div style="color: var(--text-secondary); font-size: 13px;">0.1.0</div>
+        <div style="color: var(--text-secondary); font-size: 13px;">1.2.0</div>
       </div>
     </section>
 
@@ -200,7 +200,7 @@
     const sections = document.querySelectorAll('section');
     const sidebarItems = document.querySelectorAll('.sidebar-item');
     const notchPosition = document.getElementById('notchPosition');
-    const language = document.getElementById('language');
+    const langSelect = document.getElementById('langSelect');
     const whisperModel = document.getElementById('whisperModel');
     const whisperModelHint = document.getElementById('whisperModelHint');
     const formatTextSelect = document.getElementById('formatText');
@@ -208,7 +208,6 @@
     const saveBtn = document.getElementById('save');
     const cancelBtn = document.getElementById('cancel');
 
-    // Populate whisper model options dynamically
     const WHISPER_MODELS = [
       { value: 'tiny',     hint: '39 MB, rápido, menos preciso' },
       { value: 'base',     hint: '74 MB, equilíbrio (padrão)' },
@@ -246,23 +245,8 @@
         const cfg = await window.falaiAPI.loadConfig();
         if (!cfg) return;
 
-        // DEBUG: check if 'language' is the select or something else
-        const langSelect = document.getElementById('language');
-        alert('DEBUG IDENTITY:\n'
-          + 'language === langSelect: ' + (language === langSelect) + '\n'
-          + 'typeof language: ' + typeof language + '\n'
-          + 'language.tagName: ' + (language?.tagName ?? 'N/A') + '\n'
-          + 'langSelect.tagName: ' + (langSelect?.tagName ?? 'N/A') + '\n'
-          + 'language.value BEFORE: ' + JSON.stringify(language?.value));
-
-        langSelect.value = cfg.language ?? 'auto';
-        language.value = cfg.language ?? 'auto';
-
-        alert('AFTER SET:\n'
-          + 'langSelect.value: ' + JSON.stringify(langSelect.value) + '\n'
-          + 'language.value: ' + JSON.stringify(language?.value));
-
         notchPosition.value = cfg.notchPosition ?? 'bottom-center';
+        langSelect.value = cfg.language ?? 'auto';
         if (cfg.whisperModel) {
           whisperModel.value = cfg.whisperModel;
           const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
@@ -271,7 +255,7 @@
         formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
         hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
       } catch (err) {
-        alert('ERRO: ' + err.message);
+        console.error('[settings] Erro ao carregar config:', err);
       }
     }
 
@@ -279,14 +263,14 @@
       try {
         await window.falaiAPI.saveConfig({
           notchPosition: notchPosition.value,
-          language: language.value,
+          language: langSelect.value,
           whisperModel: whisperModel.value,
           formatText: formatTextSelect.value === 'true',
           hotkey: hotkey.value,
         });
         window.falaiAPI.closeWindow();
       } catch (err) {
-        console.error('Erro ao salvar config:', err);
+        console.error('[settings] Erro ao salvar config:', err);
       }
     });
 
