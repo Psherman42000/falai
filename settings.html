@@ -247,6 +247,9 @@
         console.log('[settings] loaded config:', JSON.stringify(cfg));
         if (!cfg) return;
 
+        // DEBUG: show exactly what we got from the main process
+        window._debugConfig = cfg;
+
         notchPosition.value = cfg.notchPosition ?? 'bottom-center';
         language.value = cfg.language ?? 'auto';
         if (cfg.whisperModel) {
@@ -256,6 +259,9 @@
         }
         formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
         hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
+
+        // DEBUG: verify after setting
+        console.log('[settings] AFTER SET — language.value:', language.value, 'notchPosition.value:', notchPosition.value);
       } catch (err) {
         console.error('[settings] Erro ao carregar config:', err);
       }
