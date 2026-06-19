@@ -244,17 +244,20 @@
     async function loadConfig() {
       try {
         const cfg = await window.falaiAPI.loadConfig();
-        if (cfg.notchPosition) notchPosition.value = cfg.notchPosition;
-        if (cfg.language) language.value = cfg.language;
+        console.log('[settings] loaded config:', JSON.stringify(cfg));
+        if (!cfg) return;
+
+        notchPosition.value = cfg.notchPosition ?? 'bottom-center';
+        language.value = cfg.language ?? 'auto';
         if (cfg.whisperModel) {
           whisperModel.value = cfg.whisperModel;
           const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
           whisperModelHint.textContent = selected?.hint || '';
         }
-        if (cfg.formatText !== undefined) formatTextSelect.value = String(cfg.formatText);
-        if (cfg.hotkey) hotkey.value = cfg.hotkey;
+        formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
+        hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
       } catch (err) {
-        console.error('Erro ao carregar config:', err);
+        console.error('[settings] Erro ao carregar config:', err);
       }
     }
 
