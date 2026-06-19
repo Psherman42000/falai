@@ -246,23 +246,32 @@
         const cfg = await window.falaiAPI.loadConfig();
         if (!cfg) return;
 
-        // Set ALL fields individually with error isolation
-        try { notchPosition.value = cfg.notchPosition ?? 'bottom-center'; } catch(e) { console.error('notchPosition:', e); }
-        try { language.value = cfg.language ?? 'auto'; } catch(e) { console.error('language:', e); }
-        try {
-          if (cfg.whisperModel) {
-            whisperModel.value = cfg.whisperModel;
-            const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
-            whisperModelHint.textContent = selected?.hint || '';
-          }
-        } catch(e) { console.error('whisperModel:', e); }
-        try { formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true'; } catch(e) { console.error('formatText:', e); }
-        try { hotkey.value = cfg.hotkey ?? 'Ctrl+Space'; } catch(e) { console.error('hotkey:', e); }
+        // DEBUG: check if 'language' is the select or something else
+        const langSelect = document.getElementById('language');
+        alert('DEBUG IDENTITY:\n'
+          + 'language === langSelect: ' + (language === langSelect) + '\n'
+          + 'typeof language: ' + typeof language + '\n'
+          + 'language.tagName: ' + (language?.tagName ?? 'N/A') + '\n'
+          + 'langSelect.tagName: ' + (langSelect?.tagName ?? 'N/A') + '\n'
+          + 'language.value BEFORE: ' + JSON.stringify(language?.value));
 
-        // DEBUG: verify what actually got set
-        alert('DEPOIS DE APLICAR:\nlanguage.value = ' + JSON.stringify(language.value) + '\nnotchPosition.value = ' + JSON.stringify(notchPosition.value));
+        langSelect.value = cfg.language ?? 'auto';
+        language.value = cfg.language ?? 'auto';
+
+        alert('AFTER SET:\n'
+          + 'langSelect.value: ' + JSON.stringify(langSelect.value) + '\n'
+          + 'language.value: ' + JSON.stringify(language?.value));
+
+        notchPosition.value = cfg.notchPosition ?? 'bottom-center';
+        if (cfg.whisperModel) {
+          whisperModel.value = cfg.whisperModel;
+          const selected = WHISPER_MODELS.find(m => m.value === cfg.whisperModel);
+          whisperModelHint.textContent = selected?.hint || '';
+        }
+        formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
+        hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
       } catch (err) {
-        console.error('[settings] Erro ao carregar config:', err);
+        alert('ERRO: ' + err.message);
       }
     }
 
