@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('falaiAPI', {
   closeWindow: () => ipcRenderer.send('window-close'),
   openSettings: () => ipcRenderer.invoke('notch-open-settings'),
   quitApp: () => ipcRenderer.send('notch-quit'),
+  getAudioDevices: () => ipcRenderer.invoke('get-audio-devices'),
+  testMicrophone: (deviceArg: string) => ipcRenderer.invoke('test-microphone', deviceArg),
   onNotchState: (cb: (state: string, message?: string) => void) => {
     const handler = (_event: unknown, data: { state: string; message?: string }) => cb(data.state, data.message);
     ipcRenderer.on('notch-state', handler);

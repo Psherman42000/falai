@@ -50,6 +50,7 @@ export class FalaiPipeline extends EventEmitter {
     this.deps.hotkey.on('released', () => this.onReleased());
     this.deps.voice.on('transcription', (text: string) => this.onTranscription(text));
     this.deps.voice.on('error', (err: Error) => this.onError(err));
+    this.deps.voice.on('warn', (msg: string) => this.onWarn(msg));
     this.deps.hotkey.on('error', (err: Error) => this.onError(err));
   }
 
@@ -81,5 +82,13 @@ export class FalaiPipeline extends EventEmitter {
   private onError(err: Error): void {
     console.error('[pipeline] Error:', err.message);
     this.deps.notch.setState('error', err.message);
+  }
+
+  private onWarn(msg: string): void {
+    console.warn('[pipeline] Warning:', msg);
+    this.deps.notch.setState('error', msg);
+    setTimeout(() => {
+      if (this.deps.notch) this.deps.notch.setState('idle');
+    }, 4000);
   }
 }

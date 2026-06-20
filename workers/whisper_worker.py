@@ -81,11 +81,14 @@ class WhisperWorker:
         self.stream: sd.InputStream | None = None
         self.format_text: bool = True
 
-    def _ensure_stream(self) -> bool:
+    def _ensure_stream(self, device: str | int | None = None) -> bool:
         if self.stream is not None:
             return True
         try:
+            dev_name = str(device) if device is not None else "default"
+            log(f"Opening InputStream device={dev_name}")
             self.stream = sd.InputStream(
+                device=device,
                 samplerate=SAMPLE_RATE,
                 channels=1,
                 dtype=np.float32,
@@ -145,8 +148,8 @@ class WhisperWorker:
             send("error", {"message": str(exc)})
             return False
 
-    def start_recording(self, language: str | None = None, format_text: bool = True) -> None:
-        if not self._ensure_stream():
+    def start_recording(self, language: str | None = None, format_text: bool = True, device: str | int | None = None) -> None:
+        if not self._ensure_stream(device):
             return
         if self.model is None:
             log("Modelo ainda não carregado; carregando default...")
@@ -163,6 +166,9 @@ class WhisperWorker:
         self.recording = False
         self._close_stream()
         send("status", {"status": "processing"})
+        if len(self.audio_buffer) == 0:
+            log("AVISO: 0 samples capturados — microfone pode estar mudo ou dispositivo incorreto")
+            send("warn", {"message": "Nenhum áudio capturado. Verifique se o microfone está funcionando e selecionado."})
         self._transcribe_buffer()
 
     def feed_chunk(self, chunk: np.ndarray) -> None:
@@ -243,6 +249,26 @@ def _audio_callback(worker: WhisperWorker) -> sd.CallbackFlags:
     return callback
 
 
+def list_input_devices() -> list[dict]:
+    """Retorna lista de dispositivos de entrada disponíveis."""
+    try:
+        devices = sd.query_devices()
+        result = []
+        for i, dev in enumerate(devices):
+            if dev["max_input_channels"] > 0:
+                result.append({
+                    "index": i,
+                    "name": dev["name"],
+                    "channels": dev["max_input_channels"],
+                    "sr": int(dev["default_samplerate"]) if dev["default_samplerate"] else 0,
+                    "hostapi": dev["hostapi"],
+                })
+        return result
+    except Exception as exc:
+        log(f"Erro ao listar devices: {exc}")
+        return []
+
+
 def main() -> None:
     log("Whisper Worker iniciando")
     worker = WhisperWorker()
@@ -269,9 +295,12 @@ def main() -> None:
                     worker.start_recording(
                         language=msg.get("language"),
                         format_text=msg.get("format_text", True),
+                        device=msg.get("device"),
                     )
                 elif cmd == "stop_recording":
                     worker.stop_recording()
+                elif cmd == "list_devices":
+                    send("devices", {"devices": list_input_devices()})
                 elif cmd == "shutdown":
                     send("status", {"status": "exiting"})
                     break

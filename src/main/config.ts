@@ -11,6 +11,7 @@ export interface FalaiConfig {
   hotkey: string;
   notchPosition: 'top-center' | 'top-left' | 'top-right' | 'bottom-center' | 'bottom-left' | 'bottom-right';
   formatText: boolean;
+  microphoneDevice: string;
 }
 
 const DEFAULTS: FalaiConfig = {
@@ -19,6 +20,7 @@ const DEFAULTS: FalaiConfig = {
   hotkey: 'Ctrl+Space',
   notchPosition: 'bottom-center',
   formatText: true,
+  microphoneDevice: 'default',
 };
 
 export class ConfigManager extends EventEmitter {

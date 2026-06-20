@@ -121,6 +121,7 @@
 <body>
   <aside class="sidebar">
     <div class="sidebar-item active" data-section="general">Geral</div>
+    <div class="sidebar-item" data-section="microphone">Microfone</div>
     <div class="sidebar-item" data-section="language-section">Idioma</div>
     <div class="sidebar-item" data-section="model">Modelo</div>
     <div class="sidebar-item" data-section="shortcuts">Atalhos</div>
@@ -141,6 +142,18 @@
           <option value="top-left">Topo esquerda</option>
           <option value="top-right">Topo direita</option>
         </select>
+      </div>
+    </section>
+
+    <section id="microphone">
+      <div class="field">
+        <label>Microfone</label>
+        <select id="micSelect"></select>
+        <div class="hint" id="micHint">Selecione o dispositivo de entrada de áudio.</div>
+      </div>
+      <div class="field">
+        <button class="primary" id="testMicBtn" style="padding:8px 16px;font-size:12px;">Testar microfone</button>
+        <span id="testMicResult" style="margin-left:12px;font-size:12px;color:var(--text-muted);"></span>
       </div>
     </section>
 
@@ -207,6 +220,10 @@
     const hotkey = document.getElementById('hotkey');
     const saveBtn = document.getElementById('save');
     const cancelBtn = document.getElementById('cancel');
+    const micSelect = document.getElementById('micSelect');
+    const micHint = document.getElementById('micHint');
+    const testMicBtn = document.getElementById('testMicBtn');
+    const testMicResult = document.getElementById('testMicResult');
 
     const WHISPER_MODELS = [
       { value: 'tiny',     hint: '39 MB, rápido, menos preciso' },
@@ -240,6 +257,49 @@
 
     sections.forEach(s => s.style.display = s.id === 'general' ? 'block' : 'none');
 
+    async function loadMicrophones() {
+      try {
+        const devices = await window.falaiAPI.getAudioDevices();
+        micSelect.innerHTML = '<option value="default">Padrão do Windows</option>';
+        if (devices && devices.length > 0) {
+          devices.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = String(d.index);
+            opt.textContent = `${d.name} (${d.channels} canais, ${d.sr} Hz)`;
+            micSelect.appendChild(opt);
+          });
+        }
+        micHint.textContent = devices && devices.length > 0
+          ? `${devices.length} dispositivos encontrados. Selecione qual microfone usar.`
+          : 'Nenhum microfone detectado. Verifique se o driver de áudio está instalado.';
+      } catch (err) {
+        console.error('[settings] Erro ao listar mics:', err);
+        micSelect.innerHTML = '<option value="default">Padrão do Windows</option>';
+        micHint.textContent = 'Erro ao listar dispositivos.';
+      }
+    }
+
+    testMicBtn.addEventListener('click', async () => {
+      testMicResult.textContent = 'Gravando 1s...';
+      testMicBtn.disabled = true;
+      try {
+        const device = micSelect.value;
+        const devArg = device === 'default' ? '' : `,device=${device}`;
+        const result = await window.falaiAPI.testMicrophone(devArg);
+        if (result && result.ok) {
+          testMicResult.textContent = `OK — ${result.samples} amostras, ${result.nonSilence} não-silêncio`;
+          testMicResult.style.color = result.nonSilence > 10 ? 'var(--state-typing)' : 'var(--state-error)';
+        } else {
+          testMicResult.textContent = result?.error || 'Falha no teste';
+          testMicResult.style.color = 'var(--state-error)';
+        }
+      } catch (err) {
+        testMicResult.textContent = 'Erro: ' + err.message;
+        testMicResult.style.color = 'var(--state-error)';
+      }
+      testMicBtn.disabled = false;
+    });
+
     async function loadConfig() {
       try {
         const cfg = await window.falaiAPI.loadConfig();
@@ -254,6 +314,9 @@
         }
         formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
         hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
+        if (cfg.microphoneDevice && cfg.microphoneDevice !== 'default') {
+          micSelect.value = cfg.microphoneDevice;
+        }
       } catch (err) {
         console.error('[settings] Erro ao carregar config:', err);
       }
@@ -267,6 +330,7 @@
           whisperModel: whisperModel.value,
           formatText: formatTextSelect.value === 'true',
           hotkey: hotkey.value,
+          microphoneDevice: micSelect.value,
         });
         window.falaiAPI.closeWindow();
       } catch (err) {
@@ -278,6 +342,7 @@
       window.falaiAPI.closeWindow();
     });
 
+    loadMicrophones();
     loadConfig();
   </script>
 </body>

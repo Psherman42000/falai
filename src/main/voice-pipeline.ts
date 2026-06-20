@@ -92,10 +92,12 @@ export class VoicePipeline extends EventEmitter {
 
   startRecording(): void {
     const cfg = this.config.get();
+    const device = cfg.microphoneDevice === 'default' ? undefined : cfg.microphoneDevice;
     this.worker.send({
       cmd: 'start_recording',
       language: cfg.language === 'auto' ? null : cfg.language,
       format_text: cfg.formatText,
+      device: device,
     });
   }
 
@@ -115,6 +117,11 @@ export class VoicePipeline extends EventEmitter {
     }
     if (msg.event === 'error' && msg.message) {
       this.emit('error', new Error(msg.message));
+      return;
+    }
+    if (msg.event === 'warn' && msg.message) {
+      console.warn('[voice-pipeline]', msg.message);
+      this.emit('warn', msg.message);
       return;
     }
     if (msg.event === 'status' && msg.status === 'model_loaded' && msg.model) {
