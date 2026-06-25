@@ -68,6 +68,94 @@ def format_transcription(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Audio pre-processing — silence trim + volume normalization + noise reduction
+# ---------------------------------------------------------------------------
+
+_HAS_NOISEREDUCE = False
+try:
+    import noisereduce as nr
+    _HAS_NOISEREDUCE = True
+except ImportError:
+    pass
+
+
+def _rms(samples: np.ndarray) -> float:
+    """Root-mean-square do sinal."""
+    return float(np.sqrt(np.mean(samples ** 2)))
+
+
+def _trim_silence(
+    samples: np.ndarray,
+    sr: int,
+    threshold: float = 0.02,
+    min_silence_ms: int = 300,
+) -> np.ndarray:
+    """Remove silêncio inicial e final do áudio.
+
+    Calcula envelope de energia em frames de 10ms. Corta tudo abaixo de
+    ``threshold * peak_energy`` nas bordas. Mantém pelo menos ``min_silence_ms``
+    de silêncio residual em cada ponta pra não cortar consoantes suaves.
+    """
+    if samples.size == 0:
+        return samples
+    frame_len = int(sr * 0.01)  # 10ms frames
+    n_frames = max(1, samples.size // frame_len)
+    # Energia RMS por frame
+    frames = samples[: n_frames * frame_len].reshape(n_frames, frame_len)
+    energies = np.sqrt(np.mean(frames ** 2, axis=1))
+    peak = energies.max()
+    if peak < 1e-6:
+        return samples  # sinal morto, não corta
+    mask = energies > threshold * peak
+    if not mask.any():
+        return samples  # sem nada acima do threshold
+    # Primeiro e último frame com energia
+    first = int(mask.argmax())
+    last = int(n_frames - mask[::-1].argmax() - 1)
+    # Margem de segurança (min_silence_ms)
+    margin = max(1, min_silence_ms // 10)
+    first = max(0, first - margin)
+    last = min(n_frames - 1, last + margin)
+    return samples[first * frame_len : (last + 1) * frame_len]
+
+
+def _normalize_volume(samples: np.ndarray, target_rms: float = 0.08) -> np.ndarray:
+    """Normaliza volume RMS do sinal pra ``target_rms``.
+
+    Evita que áudios muito baixos ou muito altos prejudiquem a transcrição.
+    """
+    if samples.size == 0:
+        return samples
+    current = _rms(samples)
+    if current < 1e-6:
+        return samples
+    gain = target_rms / current
+    # Limita ganho excessivo (evita explodir ruído de fundo)
+    gain = min(gain, 3.0)
+    return (samples * gain).astype(np.float32)
+
+
+def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Aplica noise reduction via noisereduce se disponível.
+
+    Usa stationary noise reduction (perfil de ruído do início do áudio).
+    Se noisereduce não estiver instalado, retorna o áudio original.
+    """
+    if not _HAS_NOISEREDUCE or samples.size == 0:
+        return samples
+    try:
+        log(f"Aplicando noise reduction ({len(samples)/sr:.1f}s)...")
+        # Usa os primeiros 500ms como perfil de ruído
+        noise_profile = samples[:min(int(sr * 0.5), samples.size)]
+        reduced = nr.reduce_noise(y=samples, sr=sr, y_noise=noise_profile, stationary=True)
+        log("Noise reduction concluído.")
+        return reduced.astype(np.float32)
+    except Exception as exc:
+        log(f"Noise reduction falhou (seguindo sem): {exc}")
+        return samples
+
+
+# ---------------------------------------------------------------------------
 # WhisperWorker
 # ---------------------------------------------------------------------------
 
@@ -202,94 +290,6 @@ class WhisperWorker:
         if int(duration) % 5 == 0 and duration > 0:
             log(f"Áudio acumulado: {duration:.1f}s")
 
-# ---------------------------------------------------------------------------
-# Audio pre-processing — silence trim + volume normalization + noise reduction
-# ---------------------------------------------------------------------------
-
-_HAS_NOISEREDUCE = False
-try:
-    import noisereduce as nr
-    _HAS_NOISEREDUCE = True
-except ImportError:
-    pass
-
-
-def _rms(samples: np.ndarray) -> float:
-    """Root-mean-square do sinal."""
-    return float(np.sqrt(np.mean(samples ** 2)))
-
-
-def _trim_silence(
-    samples: np.ndarray,
-    sr: int,
-    threshold: float = 0.02,
-    min_silence_ms: int = 300,
-) -> np.ndarray:
-    """Remove silêncio inicial e final do áudio.
-
-    Calcula envelope de energia em frames de 10ms. Corta tudo abaixo de
-    ``threshold * peak_energy`` nas bordas. Mantém pelo menos ``min_silence_ms``
-    de silêncio residual em cada ponta pra não cortar consoantes suaves.
-    """
-    if samples.size == 0:
-        return samples
-    frame_len = int(sr * 0.01)  # 10ms frames
-    n_frames = max(1, samples.size // frame_len)
-    # Energia RMS por frame
-    frames = samples[: n_frames * frame_len].reshape(n_frames, frame_len)
-    energies = np.sqrt(np.mean(frames ** 2, axis=1))
-    peak = energies.max()
-    if peak < 1e-6:
-        return samples  # sinal morto, não corta
-    mask = energies > threshold * peak
-    if not mask.any():
-        return samples  # sem nada acima do threshold
-    # Primeiro e último frame com energia
-    first = int(mask.argmax())
-    last = int(n_frames - mask[::-1].argmax() - 1)
-    # Margem de segurança (min_silence_ms)
-    margin = max(1, min_silence_ms // 10)
-    first = max(0, first - margin)
-    last = min(n_frames - 1, last + margin)
-    return samples[first * frame_len : (last + 1) * frame_len]
-
-
-def _normalize_volume(samples: np.ndarray, target_rms: float = 0.08) -> np.ndarray:
-    """Normaliza volume RMS do sinal pra ``target_rms``.
-
-    Evita que áudios muito baixos ou muito altos prejudiquem a transcrição.
-    """
-    if samples.size == 0:
-        return samples
-    current = _rms(samples)
-    if current < 1e-6:
-        return samples
-    gain = target_rms / current
-    # Limita ganho excessivo (evita explodir ruído de fundo)
-    gain = min(gain, 3.0)
-    return (samples * gain).astype(np.float32)
-
-
-def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
-    """Aplica noise reduction via noisereduce se disponível.
-
-    Usa stationary noise reduction (perfil de ruído do início do áudio).
-    Se noisereduce não estiver instalado, retorna o áudio original.
-    """
-    if not _HAS_NOISEREDUCE or samples.size == 0:
-        return samples
-    try:
-        log(f"Aplicando noise reduction ({len(samples)/sr:.1f}s)...")
-        # Usa os primeiros 500ms como perfil de ruído
-        noise_profile = samples[:min(int(sr * 0.5), samples.size)]
-        reduced = nr.reduce_noise(y=samples, sr=sr, y_noise=noise_profile, stationary=True)
-        log("Noise reduction concluído.")
-        return reduced.astype(np.float32)
-    except Exception as exc:
-        log(f"Noise reduction falhou (seguindo sem): {exc}")
-        return samples
-
-
     def _transcribe_buffer(self) -> None:
         if self.audio_buffer.size == 0:
             send("transcription", {"text": "", "language": "", "duration": 0.0})
@@ -314,7 +314,7 @@ def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
             total_duration = len(normalized) / SAMPLE_RATE
             log(f"Áudio pré-processado: {len(raw)/SAMPLE_RATE:.1f}s → {total_duration:.1f}s (trim{' + nr' if self.reduce_noise else ''} + normalize)")
 
-            # Whisper base tem contexto limitado (~30s). Chunk em 25s com 2s overlap.
+            # Whisper base tem contexto limitado (~30s). Chunk em 25s com 3s overlap.
             CHUNK_DURATION = 25.0
             OVERLAP_DURATION = 3.0
             chunk_samples = int(CHUNK_DURATION * SAMPLE_RATE)
