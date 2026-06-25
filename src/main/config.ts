@@ -12,6 +12,7 @@ export interface FalaiConfig {
   notchPosition: 'top-center' | 'top-left' | 'top-right' | 'bottom-center' | 'bottom-left' | 'bottom-right';
   formatText: boolean;
   microphoneDevice: string;
+  noiseReduction: boolean;
 }
 
 const DEFAULTS: FalaiConfig = {
@@ -21,6 +22,7 @@ const DEFAULTS: FalaiConfig = {
   notchPosition: 'bottom-center',
   formatText: true,
   microphoneDevice: 'default',
+  noiseReduction: false,
 };
 
 export class ConfigManager extends EventEmitter {

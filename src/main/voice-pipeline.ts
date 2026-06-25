@@ -98,6 +98,7 @@ export class VoicePipeline extends EventEmitter {
       language: cfg.language === 'auto' ? null : cfg.language,
       format_text: cfg.formatText,
       device: device,
+      reduce_noise: cfg.noiseReduction,
     });
   }
 

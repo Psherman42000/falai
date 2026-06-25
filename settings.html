@@ -179,6 +179,15 @@
       </div>
 
       <div class="field">
+        <label>Redução de ruído</label>
+        <select id="noiseReduction">
+          <option value="true">Ativada — remove ruído de fundo (ventilador, digitação)</option>
+          <option value="false">Desativada — transcrição mais rápida</option>
+        </select>
+        <div class="hint">Requer `pip install noisereduce`. Melhora precisão em ambientes ruidosos. Adiciona ~1-2s de processamento.</div>
+      </div>
+
+      <div class="field">
         <label>Formatação automática</label>
         <select id="formatText">
           <option value="true">Ativada — capitaliza, pontua, normaliza espaços</option>
@@ -217,6 +226,7 @@
     const whisperModel = document.getElementById('whisperModel');
     const whisperModelHint = document.getElementById('whisperModelHint');
     const formatTextSelect = document.getElementById('formatText');
+    const noiseReduction = document.getElementById('noiseReduction');
     const hotkey = document.getElementById('hotkey');
     const saveBtn = document.getElementById('save');
     const cancelBtn = document.getElementById('cancel');
@@ -313,6 +323,7 @@
           whisperModelHint.textContent = selected?.hint || '';
         }
         formatTextSelect.value = cfg.formatText !== undefined ? String(cfg.formatText) : 'true';
+        noiseReduction.value = cfg.noiseReduction !== undefined ? String(cfg.noiseReduction) : 'false';
         hotkey.value = cfg.hotkey ?? 'Ctrl+Space';
         if (cfg.microphoneDevice && cfg.microphoneDevice !== 'default') {
           micSelect.value = cfg.microphoneDevice;
@@ -329,6 +340,7 @@
           language: langSelect.value,
           whisperModel: whisperModel.value,
           formatText: formatTextSelect.value === 'true',
+          noiseReduction: noiseReduction.value === 'true',
           hotkey: hotkey.value,
           microphoneDevice: micSelect.value,
         });

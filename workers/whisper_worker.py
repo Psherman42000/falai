@@ -80,6 +80,7 @@ class WhisperWorker:
         self.language: str | None = None
         self.stream: sd.InputStream | None = None
         self.format_text: bool = True
+        self.reduce_noise: bool = False
 
     def _ensure_stream(self, device: str | int | None = None) -> bool:
         if self.stream is not None:
@@ -168,7 +169,7 @@ class WhisperWorker:
             send("error", {"message": str(exc)})
             return False
 
-    def start_recording(self, language: str | None = None, format_text: bool = True, device: str | int | None = None) -> None:
+    def start_recording(self, language: str | None = None, format_text: bool = True, device: str | int | None = None, reduce_noise: bool = False) -> None:
         if not self._ensure_stream(device):
             return
         if self.model is None:
@@ -178,6 +179,7 @@ class WhisperWorker:
                 return
         self.language = language if language != "auto" else None
         self.format_text = format_text
+        self.reduce_noise = reduce_noise
         self.audio_buffer = np.array([], dtype=np.float32)
         self.recording = True
         send("status", {"status": "listening"})
@@ -200,9 +202,17 @@ class WhisperWorker:
         if int(duration) % 5 == 0 and duration > 0:
             log(f"Áudio acumulado: {duration:.1f}s")
 
-    # ---------------------------------------------------------------------------
-# Audio pre-processing — silence trim + volume normalization
 # ---------------------------------------------------------------------------
+# Audio pre-processing — silence trim + volume normalization + noise reduction
+# ---------------------------------------------------------------------------
+
+_HAS_NOISEREDUCE = False
+try:
+    import noisereduce as nr
+    _HAS_NOISEREDUCE = True
+except ImportError:
+    pass
+
 
 def _rms(samples: np.ndarray) -> float:
     """Root-mean-square do sinal."""
@@ -260,6 +270,26 @@ def _normalize_volume(samples: np.ndarray, target_rms: float = 0.08) -> np.ndarr
     return (samples * gain).astype(np.float32)
 
 
+def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Aplica noise reduction via noisereduce se disponível.
+
+    Usa stationary noise reduction (perfil de ruído do início do áudio).
+    Se noisereduce não estiver instalado, retorna o áudio original.
+    """
+    if not _HAS_NOISEREDUCE or samples.size == 0:
+        return samples
+    try:
+        log(f"Aplicando noise reduction ({len(samples)/sr:.1f}s)...")
+        # Usa os primeiros 500ms como perfil de ruído
+        noise_profile = samples[:min(int(sr * 0.5), samples.size)]
+        reduced = nr.reduce_noise(y=samples, sr=sr, y_noise=noise_profile, stationary=True)
+        log("Noise reduction concluído.")
+        return reduced.astype(np.float32)
+    except Exception as exc:
+        log(f"Noise reduction falhou (seguindo sem): {exc}")
+        return samples
+
+
     def _transcribe_buffer(self) -> None:
         if self.audio_buffer.size == 0:
             send("transcription", {"text": "", "language": "", "duration": 0.0})
@@ -271,16 +301,18 @@ def _normalize_volume(samples: np.ndarray, target_rms: float = 0.08) -> np.ndarr
                 return
 
         try:
-            # --- Pré-processamento: trim silence + normalize volume ---
+            # --- Pré-processamento: trim silence → noise reduction → normalize volume ---
             raw = self.audio_buffer
             trimmed = _trim_silence(raw, SAMPLE_RATE)
             if len(trimmed) < SAMPLE_RATE * 0.3:  # < 300ms de áudio útil
                 log(f"Áudio muito curto após trim: {len(trimmed)/SAMPLE_RATE:.1f}s — possivelmente microfone mudo")
                 send("transcription", {"text": "", "language": "", "duration": 0.0})
                 return
-            normalized = _normalize_volume(trimmed)
+            # Noise reduction (opcional)
+            cleaned = _reduce_noise(trimmed, SAMPLE_RATE) if self.reduce_noise else trimmed
+            normalized = _normalize_volume(cleaned)
             total_duration = len(normalized) / SAMPLE_RATE
-            log(f"Áudio pré-processado: {len(raw)/SAMPLE_RATE:.1f}s → {total_duration:.1f}s (trim) + normalize")
+            log(f"Áudio pré-processado: {len(raw)/SAMPLE_RATE:.1f}s → {total_duration:.1f}s (trim{' + nr' if self.reduce_noise else ''} + normalize)")
 
             # Whisper base tem contexto limitado (~30s). Chunk em 25s com 2s overlap.
             CHUNK_DURATION = 25.0
@@ -384,6 +416,7 @@ def main() -> None:
                         language=msg.get("language"),
                         format_text=msg.get("format_text", True),
                         device=msg.get("device"),
+                        reduce_noise=msg.get("reduce_noise", False),
                     )
                 elif cmd == "stop_recording":
                     worker.stop_recording()
