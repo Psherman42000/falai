@@ -137,9 +137,29 @@ class WhisperWorker:
         try:
             self.unload_model()
             log(f"Carregando modelo '{model_name}'...")
-            self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
+
+            # Tenta GPU (float16) primeiro — mesma estratégia do Hermes
+            try:
+                self.model = WhisperModel(model_name, device="auto", compute_type="auto")
+                log(f"Modelo '{model_name}' carregado (GPU/auto).")
+            except Exception as exc:
+                msg = str(exc).lower()
+                # Só cai pra CPU se for erro de CUDA — outros erros (OOM, modelo inválido) sobem
+                is_cuda_err = any(
+                    m in msg for m in [
+                        "libcublas", "libcudnn", "libcudart",
+                        "cannot be loaded", "cannot open shared object",
+                        "no kernel image", "no cuda-capable device",
+                        "cuda driver version is insufficient",
+                    ]
+                )
+                if not is_cuda_err:
+                    raise
+                log(f"CUDA indisponível ({exc}) — caindo pra CPU int8...")
+                self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                log(f"Modelo '{model_name}' carregado (CPU int8).")
+
             self.model_name = model_name
-            log(f"Modelo '{model_name}' carregado.")
             send("status", {"status": "model_loaded", "model": model_name})
             return True
         except Exception as exc:
@@ -180,6 +200,66 @@ class WhisperWorker:
         if int(duration) % 5 == 0 and duration > 0:
             log(f"Áudio acumulado: {duration:.1f}s")
 
+    # ---------------------------------------------------------------------------
+# Audio pre-processing — silence trim + volume normalization
+# ---------------------------------------------------------------------------
+
+def _rms(samples: np.ndarray) -> float:
+    """Root-mean-square do sinal."""
+    return float(np.sqrt(np.mean(samples ** 2)))
+
+
+def _trim_silence(
+    samples: np.ndarray,
+    sr: int,
+    threshold: float = 0.02,
+    min_silence_ms: int = 300,
+) -> np.ndarray:
+    """Remove silêncio inicial e final do áudio.
+
+    Calcula envelope de energia em frames de 10ms. Corta tudo abaixo de
+    ``threshold * peak_energy`` nas bordas. Mantém pelo menos ``min_silence_ms``
+    de silêncio residual em cada ponta pra não cortar consoantes suaves.
+    """
+    if samples.size == 0:
+        return samples
+    frame_len = int(sr * 0.01)  # 10ms frames
+    n_frames = max(1, samples.size // frame_len)
+    # Energia RMS por frame
+    frames = samples[: n_frames * frame_len].reshape(n_frames, frame_len)
+    energies = np.sqrt(np.mean(frames ** 2, axis=1))
+    peak = energies.max()
+    if peak < 1e-6:
+        return samples  # sinal morto, não corta
+    mask = energies > threshold * peak
+    if not mask.any():
+        return samples  # sem nada acima do threshold
+    # Primeiro e último frame com energia
+    first = int(mask.argmax())
+    last = int(n_frames - mask[::-1].argmax() - 1)
+    # Margem de segurança (min_silence_ms)
+    margin = max(1, min_silence_ms // 10)
+    first = max(0, first - margin)
+    last = min(n_frames - 1, last + margin)
+    return samples[first * frame_len : (last + 1) * frame_len]
+
+
+def _normalize_volume(samples: np.ndarray, target_rms: float = 0.08) -> np.ndarray:
+    """Normaliza volume RMS do sinal pra ``target_rms``.
+
+    Evita que áudios muito baixos ou muito altos prejudiquem a transcrição.
+    """
+    if samples.size == 0:
+        return samples
+    current = _rms(samples)
+    if current < 1e-6:
+        return samples
+    gain = target_rms / current
+    # Limita ganho excessivo (evita explodir ruído de fundo)
+    gain = min(gain, 3.0)
+    return (samples * gain).astype(np.float32)
+
+
     def _transcribe_buffer(self) -> None:
         if self.audio_buffer.size == 0:
             send("transcription", {"text": "", "language": "", "duration": 0.0})
@@ -191,8 +271,16 @@ class WhisperWorker:
                 return
 
         try:
-            total_duration = len(self.audio_buffer) / SAMPLE_RATE
-            log(f"Transcrevendo {total_duration:.1f}s de áudio...")
+            # --- Pré-processamento: trim silence + normalize volume ---
+            raw = self.audio_buffer
+            trimmed = _trim_silence(raw, SAMPLE_RATE)
+            if len(trimmed) < SAMPLE_RATE * 0.3:  # < 300ms de áudio útil
+                log(f"Áudio muito curto após trim: {len(trimmed)/SAMPLE_RATE:.1f}s — possivelmente microfone mudo")
+                send("transcription", {"text": "", "language": "", "duration": 0.0})
+                return
+            normalized = _normalize_volume(trimmed)
+            total_duration = len(normalized) / SAMPLE_RATE
+            log(f"Áudio pré-processado: {len(raw)/SAMPLE_RATE:.1f}s → {total_duration:.1f}s (trim) + normalize")
 
             # Whisper base tem contexto limitado (~30s). Chunk em 25s com 2s overlap.
             CHUNK_DURATION = 25.0
@@ -204,16 +292,16 @@ class WhisperWorker:
             detected_language = self.language
 
             start = 0
-            while start < len(self.audio_buffer):
-                end = min(start + chunk_samples, len(self.audio_buffer))
-                chunk = self.audio_buffer[start:end]
+            while start < len(normalized):
+                end = min(start + chunk_samples, len(normalized))
+                chunk = normalized[start:end]
 
                 segments, info = self.model.transcribe(
                     chunk,
                     language=detected_language,
                     beam_size=5,
                     vad_filter=True,
-                    condition_on_previous_text=False,  # evita acumulo de erro entre chunks
+                    condition_on_previous_text=False,
                 )
                 chunk_text = " ".join(seg.text.strip() for seg in segments).strip()
                 if chunk_text:
@@ -223,9 +311,9 @@ class WhisperWorker:
 
                 log(f"  Chunk {start/SAMPLE_RATE:.1f}s-{end/SAMPLE_RATE:.1f}s: '{chunk_text[:60]}{'...' if len(chunk_text) > 60 else ''}'")
 
-                if end >= len(self.audio_buffer):
+                if end >= len(raw):
                     break
-                start = end - overlap_samples  # overlap para não perder palavras no corte
+                start = end - overlap_samples
 
             full_text = " ".join(all_texts).strip()
             final_text = format_transcription(full_text) if self.format_text else full_text
