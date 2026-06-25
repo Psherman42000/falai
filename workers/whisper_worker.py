@@ -18,7 +18,7 @@ import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
 
-DEFAULT_MODEL = "base"
+DEFAULT_MODEL = "small"
 SUPPORTED_MODELS = {"tiny", "base", "small", "medium", "large", "large-v2", "large-v3"}
 SAMPLE_RATE = 16000
 

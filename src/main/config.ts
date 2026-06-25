@@ -17,7 +17,7 @@ export interface FalaiConfig {
 
 const DEFAULTS: FalaiConfig = {
   language: 'auto',
-  whisperModel: 'base',
+  whisperModel: 'small',
   hotkey: 'Ctrl+Space',
   notchPosition: 'bottom-center',
   formatText: true,
