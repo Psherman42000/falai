@@ -316,12 +316,13 @@ def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
 
             # Whisper base tem contexto limitado (~30s). Chunk em 25s com 2s overlap.
             CHUNK_DURATION = 25.0
-            OVERLAP_DURATION = 2.0
+            OVERLAP_DURATION = 3.0
             chunk_samples = int(CHUNK_DURATION * SAMPLE_RATE)
             overlap_samples = int(OVERLAP_DURATION * SAMPLE_RATE)
 
             all_texts: list[str] = []
             detected_language = self.language
+            last_chunk_tail: str = ""  # para dedup nas bordas entre chunks
 
             start = 0
             while start < len(normalized):
@@ -336,8 +337,32 @@ def _reduce_noise(samples: np.ndarray, sr: int = 16000) -> np.ndarray:
                     condition_on_previous_text=False,
                 )
                 chunk_text = " ".join(seg.text.strip() for seg in segments).strip()
+
+                # Dedup: se as primeiras N palavras do chunk atual repetem
+                # o final do chunk anterior, remove a duplicata
+                if chunk_text and last_chunk_tail:
+                    current_words = chunk_text.split()
+                    tail_words = last_chunk_tail.split()
+                    # Tenta casar o máximo de palavras consecutivas do tail no início do current
+                    overlap_count = 0
+                    for i in range(min(len(current_words), len(tail_words)), 0, -1):
+                        # Compara as últimas i palavras do tail com as primeiras i do current
+                        tail_end = tail_words[-i:] if i <= len(tail_words) else tail_words
+                        current_start = current_words[:i]
+                        if tail_end == current_start:
+                            overlap_count = i
+                            break
+                    if overlap_count > 0:
+                        chunk_text = " ".join(current_words[overlap_count:])
+                        log(f"  Dedup: removidas {overlap_count} palavras repetidas na borda")
+
                 if chunk_text:
                     all_texts.append(chunk_text)
+                    # Guarda fim do chunk para dedup (últimas ~15 palavras)
+                    words = chunk_text.split()
+                    last_chunk_tail = " ".join(words[-15:]) if len(words) > 15 else chunk_text
+                else:
+                    last_chunk_tail = ""
                 if detected_language is None:
                     detected_language = info.language
 
